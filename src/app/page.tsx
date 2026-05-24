@@ -1,6 +1,17 @@
-import { redirect } from "next/navigation";
+import { createClient } from '@/utils/supabase/server'
+import { cookies } from 'next/headers'
 
-// Root route: just redirect to /dashboard (middleware handles auth)
-export default function RootPage() {
-  redirect("/dashboard");
+export default async function Page() {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+
+  const { data: todos } = await supabase.from('todos').select()
+
+  return (
+    <ul>
+      {todos?.map((todo) => (
+        <li key={todo.id}>{todo.name}</li>
+      ))}
+    </ul>
+  )
 }
