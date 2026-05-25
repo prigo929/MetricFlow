@@ -10,7 +10,7 @@ import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/utils/formatting";
-import { Plus, Building2, Globe } from "lucide-react";
+import { Plus, Building2, Globe, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Company } from "@/types/database";
 
 export const metadata: Metadata = { title: "Companies" };
@@ -18,7 +18,7 @@ export const metadata: Metadata = { title: "Companies" };
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: { q?: string; tier?: string; page?: string; limit?: string };
+  searchParams: { q?: string; tier?: string; page?: string; limit?: string; sort?: string; order?: string };
 }) {
   const supabase = await createClient();
   
@@ -26,6 +26,8 @@ export default async function CompaniesPage({
   const tier = searchParams.tier || "";
   const page = parseInt(searchParams.page || "1", 10);
   const limit = parseInt(searchParams.limit || "10", 10);
+  const sort = searchParams.sort || "created_at";
+  const order = searchParams.order || "desc";
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
@@ -38,7 +40,7 @@ export default async function CompaniesPage({
     listQuery = listQuery.eq("tier", tier);
   }
   const { data: listData, count } = await listQuery
-    .order("created_at", { ascending: false })
+    .order(sort, { ascending: order === "asc" })
     .range(from, to);
 
   // Build export query (without limit/range)
@@ -49,7 +51,7 @@ export default async function CompaniesPage({
   if (tier) {
     exportQuery = exportQuery.eq("tier", tier);
   }
-  const { data: exportData } = await exportQuery.order("created_at", { ascending: false });
+  const { data: exportData } = await exportQuery.order(sort, { ascending: order === "asc" });
 
   const companies = (listData ?? []) as Company[];
   const exportCompanies = (exportData ?? []) as Company[];
@@ -92,10 +94,44 @@ export default async function CompaniesPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  {["Company", "Industry", "Country", "Tier", "Revenue", ""].map((h) => (
-                    <th key={h} className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
-                  ))}
+                <tr className="border-b border-gray-100 bg-gray-50/30">
+                  {[
+                    { label: "Company", key: "name", width: "w-[30%]" },
+                    { label: "Industry", key: "industry", width: "w-[20%]" },
+                    { label: "Country", key: "country", width: "w-[15%]" },
+                    { label: "Tier", key: "tier", width: "w-[15%]" },
+                    { label: "Revenue", key: "annual_revenue", width: "w-[15%]" },
+                  ].map((col) => {
+                    const isSorted = sort === col.key;
+                    const nextOrder = isSorted && order === "asc" ? "desc" : "asc";
+                    
+                    const nextParams = new URLSearchParams();
+                    if (q) nextParams.set("q", q);
+                    if (tier) nextParams.set("tier", tier);
+                    nextParams.set("page", "1");
+                    if (limit) nextParams.set("limit", limit.toString());
+                    nextParams.set("sort", col.key);
+                    nextParams.set("order", nextOrder);
+
+                    return (
+                      <th key={col.key} className={`py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide text-left ${col.width}`}>
+                        <Link
+                          href={`/companies?${nextParams.toString()}`}
+                          className="flex items-center gap-1.5 hover:text-gray-900 transition-colors group"
+                        >
+                          {col.label}
+                          <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+                            {isSorted ? (
+                              order === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                            ) : (
+                              <ArrowUpDown size={13} className="opacity-40 group-hover:opacity-100" />
+                            )}
+                          </span>
+                        </Link>
+                      </th>
+                    );
+                  })}
+                  <th className="py-3 px-4 w-[5%]"></th>
                 </tr>
               </thead>
               <tbody>

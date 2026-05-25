@@ -10,7 +10,7 @@ import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency, formatDate } from "@/lib/utils/formatting";
-import { Plus, ShoppingCart } from "lucide-react";
+import { Plus, ShoppingCart, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Order, Company, UserProfile } from "@/types/database";
 
 export const metadata: Metadata = { title: "Orders" };
@@ -20,7 +20,7 @@ type OrderRow = Order & { company: Pick<Company, "name"> | null; assigned_user: 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { q?: string; status?: string; page?: string; limit?: string };
+  searchParams: { q?: string; status?: string; page?: string; limit?: string; sort?: string; order?: string };
 }) {
   const supabase = await createClient();
   
@@ -28,6 +28,8 @@ export default async function OrdersPage({
   const status = searchParams.status || "";
   const page = parseInt(searchParams.page || "1", 10);
   const limit = parseInt(searchParams.limit || "10", 10);
+  const sort = searchParams.sort || "order_date";
+  const order = searchParams.order || "desc";
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
@@ -73,7 +75,7 @@ export default async function OrdersPage({
   }
 
   const { data: listData, count } = await listQuery
-    .order("order_date", { ascending: false })
+    .order(sort, { ascending: order === "asc" })
     .range(from, to);
 
   // Build export query (without limit/range)
@@ -96,7 +98,7 @@ export default async function OrdersPage({
     exportQuery = exportQuery.or(conditions.join(","));
   }
 
-  const { data: exportData } = await exportQuery.order("order_date", { ascending: false });
+  const { data: exportData } = await exportQuery.order(sort, { ascending: order === "asc" });
 
   const orders = (listData ?? []) as OrderRow[];
   const exportOrders = (exportData ?? []) as OrderRow[];
@@ -143,10 +145,53 @@ export default async function OrdersPage({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100">
-                  {["Order #", "Company", "Assigned To", "Status", "Date", "Total", ""].map((h) => (
-                    <th key={h} className="text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide">{h}</th>
-                  ))}
+                <tr className="border-b border-gray-100 bg-gray-50/30">
+                  {[
+                    { label: "Order #", key: "order_number", sortable: true, width: "w-[15%]" },
+                    { label: "Company", key: "company", sortable: false, width: "w-[25%]" },
+                    { label: "Assigned To", key: "assigned_to", sortable: false, width: "w-[20%]" },
+                    { label: "Status", key: "status", sortable: true, width: "w-[15%]" },
+                    { label: "Date", key: "order_date", sortable: true, width: "w-[15%]" },
+                    { label: "Total", key: "total_amount", sortable: true, width: "w-[10%]" },
+                  ].map((col) => {
+                    if (!col.sortable) {
+                      return (
+                        <th key={col.label} className={`text-left py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide ${col.width}`}>
+                          {col.label}
+                        </th>
+                      );
+                    }
+
+                    const isSorted = sort === col.key;
+                    const nextOrder = isSorted && order === "asc" ? "desc" : "asc";
+                    
+                    const nextParams = new URLSearchParams();
+                    if (q) nextParams.set("q", q);
+                    if (status) nextParams.set("status", status);
+                    nextParams.set("page", "1");
+                    if (limit) nextParams.set("limit", limit.toString());
+                    nextParams.set("sort", col.key);
+                    nextParams.set("order", nextOrder);
+
+                    return (
+                      <th key={col.key} className={`py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide text-left ${col.width}`}>
+                        <Link
+                          href={`/orders?${nextParams.toString()}`}
+                          className="flex items-center gap-1.5 hover:text-gray-900 transition-colors group"
+                        >
+                          {col.label}
+                          <span className="text-gray-400 group-hover:text-gray-600 transition-colors">
+                            {isSorted ? (
+                              order === "asc" ? <ArrowUp size={13} /> : <ArrowDown size={13} />
+                            ) : (
+                              <ArrowUpDown size={13} className="opacity-40 group-hover:opacity-100" />
+                            )}
+                          </span>
+                        </Link>
+                      </th>
+                    );
+                  })}
+                  <th className="py-3 px-4 w-[5%]"></th>
                 </tr>
               </thead>
               <tbody>
