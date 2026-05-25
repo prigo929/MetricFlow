@@ -187,7 +187,9 @@ export default async function DashboardPage({
 
       {/* Sales Intelligence & Alerts Grid */}
       {(churnAlerts.length > 0 || velocityAlerts.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className={`grid grid-cols-1 ${
+          churnAlerts.length > 0 && velocityAlerts.length > 0 ? "md:grid-cols-2" : ""
+        } gap-4`}>
           {/* Churn Risk Alerts */}
           {churnAlerts.length > 0 && (
             <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 shadow-sm flex items-start gap-2.5">
