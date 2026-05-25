@@ -3,8 +3,23 @@ import { createClient } from "@/lib/supabase/server";
 import { KpiCard } from "@/components/shared/KpiCard";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RevenueChart } from "@/components/charts/RevenueChart";
-import { OrderStatusChart } from "@/components/charts/OrderStatusChart";
+import dynamic from "next/dynamic";
+
+const RevenueChart = dynamic(
+  () => import("@/components/charts/RevenueChart").then((mod) => mod.RevenueChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
+  }
+);
+
+const OrderStatusChart = dynamic(
+  () => import("@/components/charts/OrderStatusChart").then((mod) => mod.OrderStatusChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
+  }
+);
 import { TopCustomersTable } from "@/components/charts/TopCustomersTable";
 import { DollarSign, ShoppingCart, Users, TrendingUp } from "lucide-react";
 import type { RevenueByMonth, TopCustomer } from "@/types/database";

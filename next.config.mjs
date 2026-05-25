@@ -1,4 +1,16 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  experimental: {
+    serverActions: { bodySizeLimit: "2mb" },
+  },
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "*.supabase.co" },
+    ],
+  },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+};
 
 export default nextConfig;

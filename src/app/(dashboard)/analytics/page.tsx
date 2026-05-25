@@ -2,9 +2,31 @@ import { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { RevenueChart } from "@/components/charts/RevenueChart";
-import { ProductPerformanceChart } from "@/components/charts/ProductPerformanceChart";
-import { SalesRepChart } from "@/components/charts/SalesRepChart";
+import dynamic from "next/dynamic";
+
+const RevenueChart = dynamic(
+  () => import("@/components/charts/RevenueChart").then((mod) => mod.RevenueChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
+  }
+);
+
+const ProductPerformanceChart = dynamic(
+  () => import("@/components/charts/ProductPerformanceChart").then((mod) => mod.ProductPerformanceChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
+  }
+);
+
+const SalesRepChart = dynamic(
+  () => import("@/components/charts/SalesRepChart").then((mod) => mod.SalesRepChart),
+  {
+    ssr: false,
+    loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
+  }
+);
 import type { RevenueByMonth, ProductPerf, SalesByRep } from "@/types/database";
 
 export const metadata: Metadata = { title: "Analytics" };
