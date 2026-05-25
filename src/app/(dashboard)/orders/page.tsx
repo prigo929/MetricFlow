@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableFilters } from "@/components/shared/TableFilters";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { formatCurrency, formatDate } from "@/lib/utils/formatting";
 import { Plus, ShoppingCart } from "lucide-react";
 import type { Order, Company, UserProfile } from "@/types/database";
@@ -50,7 +51,10 @@ export default async function OrdersPage({
   return (
     <div>
       <PageHeader title="Orders" subtitle={`${orders.length} orders total`}>
-        <Link href="/orders/new"><Button><Plus size={16} />New Order</Button></Link>
+        <div className="flex gap-2">
+          <ExportButton data={orders} filename="orders" />
+          <Link href="/orders/new"><Button><Plus size={16} />New Order</Button></Link>
+        </div>
       </PageHeader>
 
       <TableFilters

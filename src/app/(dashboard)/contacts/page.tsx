@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Plus, Users } from "lucide-react";
 import type { Contact, Company } from "@/types/database";
@@ -21,7 +22,10 @@ export default async function ContactsPage() {
   return (
     <div>
       <PageHeader title="Contacts" subtitle={`${contacts.length} contacts across all companies`}>
-        <Link href="/contacts/new"><Button><Plus size={16} />Add Contact</Button></Link>
+        <div className="flex gap-2">
+          <ExportButton data={contacts} filename="contacts" />
+          <Link href="/contacts/new"><Button><Plus size={16} />Add Contact</Button></Link>
+        </div>
       </PageHeader>
 
       {!contacts.length ? (

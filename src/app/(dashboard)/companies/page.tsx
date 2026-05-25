@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { TierBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableFilters } from "@/components/shared/TableFilters";
+import { ExportButton } from "@/components/shared/ExportButton";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { Plus, Building2, Globe } from "lucide-react";
 import type { Company } from "@/types/database";
@@ -39,7 +40,10 @@ export default async function CompaniesPage({
   return (
     <div>
       <PageHeader title="Companies" subtitle={`${companies.length} companies in your CRM`}>
-        <Link href="/companies/new"><Button><Plus size={16} />Add Company</Button></Link>
+        <div className="flex gap-2">
+          <ExportButton data={companies} filename="companies" />
+          <Link href="/companies/new"><Button><Plus size={16} />Add Company</Button></Link>
+        </div>
       </PageHeader>
 
       <TableFilters
