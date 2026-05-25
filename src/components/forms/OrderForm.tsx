@@ -6,6 +6,7 @@ import { useState } from "react";
 import { orderSchema } from "@/lib/validations/schemas";
 import type { OrderFormValues } from "@/lib/validations/schemas";
 import { createOrder } from "@/actions/orders";
+import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -61,12 +62,33 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
 
     if (overStockItem) {
       const p = products.find((prod) => prod.id === overStockItem.product_id);
-      setServerError(`Cannot place order: "${p?.name}" has only ${p?.stock_qty} units in stock.`);
+      const errMsg = `Cannot place order: "${p?.name}" has only ${p?.stock_qty} units in stock.`;
+      setServerError(errMsg);
+      toast({
+        title: "Insufficient stock",
+        description: `"${p?.name}" has only ${p?.stock_qty} units in stock.`,
+        variant: "destructive",
+      });
       return;
     }
 
     const result = await createOrder(values);
-    if (!result.success) { setServerError(result.error); return; }
+    if (!result.success) {
+      setServerError(result.error);
+      toast({
+        title: "Error placing order",
+        description: result.error || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: "Order placed successfully",
+      description: `Order #${result.data.order_number} has been created.`,
+      variant: "success",
+    });
+
     router.push(`/orders/${result.data.id}`);
   };
 

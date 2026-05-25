@@ -6,6 +6,7 @@ import { useState } from "react";
 import { productSchema } from "@/lib/validations/schemas";
 import type { ProductFormValues } from "@/lib/validations/schemas";
 import { createProduct, updateProduct } from "@/actions/products";
+import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -47,7 +48,24 @@ export function ProductForm({ product }: { product?: Product }) {
     const result = product
       ? await updateProduct(product.id, values)
       : await createProduct(values);
-    if (!result.success) { setServerError(result.error); return; }
+    if (!result.success) {
+      setServerError(result.error);
+      toast({
+        title: "Error saving product",
+        description: result.error || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: product ? "Product updated" : "Product created",
+      description: product
+        ? `${values.name} details have been saved.`
+        : `${values.name} has been added successfully.`,
+      variant: "success",
+    });
+
     router.push("/products");
     router.refresh();
   };

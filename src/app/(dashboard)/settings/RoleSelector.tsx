@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { updateUserRole } from "@/actions/users";
+import { toast } from "@/hooks/use-toast";
 
 interface Props {
   userId: string;
@@ -20,14 +21,31 @@ export function RoleSelector({ userId, currentRole }: Props) {
     try {
       const res = await updateUserRole(userId, newRole);
       if (!res.success) {
-        setError(res.error || "Failed to update role");
+        const errMsg = res.error || "Failed to update role";
+        setError(errMsg);
         setRole(currentRole); // Revert UI
+        toast({
+          title: "Role update failed",
+          description: errMsg,
+          variant: "destructive",
+        });
       } else {
         setRole(newRole);
+        toast({
+          title: "User role updated",
+          description: `User role has been successfully changed to "${newRole}".`,
+          variant: "success",
+        });
       }
     } catch (err: any) {
-      setError(err.message || "An error occurred");
+      const errMsg = err.message || "An error occurred";
+      setError(errMsg);
       setRole(currentRole); // Revert UI
+      toast({
+        title: "Error updating role",
+        description: errMsg,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }

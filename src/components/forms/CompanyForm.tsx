@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { companySchema } from "@/lib/validations/schemas";
 import { createCompany, updateCompany } from "@/actions/companies";
+import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -64,7 +65,24 @@ export function CompanyForm({ company }: CompanyFormProps) {
       ? await updateCompany(company.id, values)
       : await createCompany(values);
 
-    if (!result.success) { setServerError(result.error); return; }
+    if (!result.success) {
+      setServerError(result.error);
+      toast({
+        title: "Error saving company",
+        description: result.error || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    toast({
+      title: company ? "Company updated" : "Company created",
+      description: company
+        ? `${values.name} details have been saved.`
+        : `${values.name} has been added successfully.`,
+      variant: "success",
+    });
+
     router.push("/companies");
     router.refresh();
   };

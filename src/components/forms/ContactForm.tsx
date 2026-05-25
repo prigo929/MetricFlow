@@ -6,6 +6,7 @@ import { useState } from "react";
 import { contactSchema } from "@/lib/validations/schemas";
 import type { ContactFormValues } from "@/lib/validations/schemas";
 import { createContact, updateContact } from "@/actions/contacts";
+import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,24 @@ export function ContactForm({ contact, companies, defaultCompanyId }: Props) {
   const onSubmit: SubmitHandler<ContactFormValues> = async (values) => {
     setServerError(null);
     const result = contact ? await updateContact(contact.id, values) : await createContact(values);
-    if (!result.success) { setServerError(result.error); return; }
+    if (!result.success) {
+      setServerError(result.error);
+      toast({
+        title: "Error saving contact",
+        description: result.error || "An unexpected error occurred.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    toast({
+      title: contact ? "Contact updated" : "Contact added",
+      description: contact
+        ? `${values.full_name} details have been saved.`
+        : `${values.full_name} has been added successfully.`,
+      variant: "success",
+    });
+
     router.back();
     router.refresh();
   };
