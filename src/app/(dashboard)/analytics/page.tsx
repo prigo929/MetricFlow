@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimeRangeFilter } from "@/components/shared/TimeRangeFilter";
-import { RfmDetailsTable } from "@/components/shared/RfmDetailsTable";
+import { RfmDetailsTable } from "./components/RfmDetailsTable";
 import {
   getStartDate,
   aggregateRevenueTrend,
@@ -22,7 +22,7 @@ const RevenueChart = dynamic(
 );
 
 const ProductPerformanceChart = dynamic(
-  () => import("@/components/charts/ProductPerformanceChart").then((mod) => mod.ProductPerformanceChart),
+  () => import("./components/ProductPerformanceChart").then((mod) => mod.ProductPerformanceChart),
   {
     ssr: false,
     loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
@@ -30,7 +30,7 @@ const ProductPerformanceChart = dynamic(
 );
 
 const SalesRepChart = dynamic(
-  () => import("@/components/charts/SalesRepChart").then((mod) => mod.SalesRepChart),
+  () => import("./components/SalesRepChart").then((mod) => mod.SalesRepChart),
   {
     ssr: false,
     loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
@@ -38,7 +38,7 @@ const SalesRepChart = dynamic(
 );
 
 const RfmSegmentChart = dynamic(
-  () => import("@/components/charts/RfmSegmentChart").then((mod) => mod.RfmSegmentChart),
+  () => import("./components/RfmSegmentChart").then((mod) => mod.RfmSegmentChart),
   {
     ssr: false,
     loading: () => <div className="h-[240px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,

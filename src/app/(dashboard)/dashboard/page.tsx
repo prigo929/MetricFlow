@@ -18,7 +18,7 @@ const RevenueChart = dynamic(
 );
 
 const OrderStatusChart = dynamic(
-  () => import("@/components/charts/OrderStatusChart").then((mod) => mod.OrderStatusChart),
+  () => import("./components/OrderStatusChart").then((mod) => mod.OrderStatusChart),
   {
     ssr: false,
     loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
@@ -26,7 +26,7 @@ const OrderStatusChart = dynamic(
 );
 
 const TopCustomersTable = dynamic(
-  () => import("@/components/charts/TopCustomersTable").then((mod) => mod.TopCustomersTable),
+  () => import("./components/TopCustomersTable").then((mod) => mod.TopCustomersTable),
   {
     ssr: false,
     loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading leaderboard...</div>,
