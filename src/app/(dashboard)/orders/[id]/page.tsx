@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { OrderStatusUpdater } from "@/components/shared/OrderStatusUpdater";
-import { formatCurrency, formatDate } from "@/lib/utils/formatting";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Building2, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { Order, OrderItem, Company, Product, UserProfile } from "@/types/database";

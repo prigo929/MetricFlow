@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { updateOrderStatus } from "@/actions/orders";
 import { Button } from "@/components/ui/button";
-import { ORDER_STATUS_CONFIG } from "@/lib/utils/formatting";
+import { ORDER_STATUS_CONFIG } from "@/lib/utils";
 import type { OrderStatus } from "@/types/database";
 
 const TRANSITIONS: Record<OrderStatus, OrderStatus | null> = {

@@ -9,7 +9,7 @@ import {
   aggregateRevenueTrend,
   aggregateProductPerformance,
   aggregateSalesRepPerformance,
-} from "@/lib/utils/aggregation";
+} from "@/lib/analytics";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 

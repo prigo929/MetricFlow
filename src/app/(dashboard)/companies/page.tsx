@@ -9,7 +9,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
-import { formatCurrency } from "@/lib/utils/formatting";
+import { formatCurrency } from "@/lib/utils";
 import { Plus, Building2, Globe, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
 import type { Company } from "@/types/database";
 

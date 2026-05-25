@@ -1,4 +1,4 @@
-import { cn, ORDER_STATUS_CONFIG, TIER_CONFIG } from "@/lib/utils/formatting";
+import { cn, ORDER_STATUS_CONFIG, TIER_CONFIG } from "@/lib/utils";
 
 export function OrderStatusBadge({ status }: { status: string }) {
   const config = ORDER_STATUS_CONFIG[status] ?? { label: status, color: "text-gray-600", bg: "bg-gray-100" };

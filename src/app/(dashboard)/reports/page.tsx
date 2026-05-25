@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { ExportButton } from "@/components/shared/ExportButton";
-import { formatCurrency, formatDate } from "@/lib/utils/formatting";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { FileText } from "lucide-react";
 import type { Order, Company } from "@/types/database";
 

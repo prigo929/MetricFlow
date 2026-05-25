@@ -131,7 +131,7 @@ For regulatory compliance, MetricFlow implements an automated audit trail for co
 
 #### A. Zero-Fill Chronological Chart Aggregation
 Standard databases only record transactions when orders occur. This creates a data visualization issue: a company with sales on Monday and Friday, but none in between, will render a chart that skips Tuesday, Wednesday, and Thursday entirely, causing a misleading slope.
-*   **The Solution**: MetricFlow implements a zero-fill alignment algorithm in `src/lib/utils/aggregation.ts`.
+*   **The Solution**: MetricFlow implements a zero-fill alignment algorithm in `src/lib/analytics.ts`.
 *   **How it works**: 
     1. The function determines the bounds of the selected range (7 days, 30 days, or 12 months).
     2. It pre-populates a local JS object with every chronological key in that range (e.g. daily dates or monthly descriptors) initialized with `0` values.

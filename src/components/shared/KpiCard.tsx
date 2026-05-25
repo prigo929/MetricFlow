@@ -1,4 +1,4 @@
-import { cn, formatCurrency, formatPercent } from "@/lib/utils/formatting";
+import { cn, formatCurrency, formatPercent } from "@/lib/utils";
 import { TrendingUp, TrendingDown, Minus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 

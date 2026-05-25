@@ -4,7 +4,7 @@ import { KpiCard } from "@/components/shared/KpiCard";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimeRangeFilter } from "@/components/shared/TimeRangeFilter";
-import { getStartDate, aggregateRevenueTrend } from "@/lib/utils/aggregation";
+import { getStartDate, aggregateRevenueTrend } from "@/lib/analytics";
 import { DollarSign, ShoppingCart, Users, TrendingUp, ShieldAlert } from "lucide-react";
 import Link from "next/link";
 import dynamic from "next/dynamic";

@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TierBadge } from "@/components/shared/StatusBadge";
 import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { formatCurrency, formatDate } from "@/lib/utils/formatting";
+import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Globe, Users, Mail, Phone } from "lucide-react";
 import type { Company, Contact, Order } from "@/types/database";
 

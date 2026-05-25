@@ -1,4 +1,4 @@
-import { formatCurrency } from "@/lib/utils/formatting";
+import { formatCurrency } from "@/lib/utils";
 import { TierBadge } from "@/components/shared/StatusBadge";
 
 interface Customer {

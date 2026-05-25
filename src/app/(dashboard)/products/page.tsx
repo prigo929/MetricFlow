@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { formatCurrency } from "@/lib/utils/formatting";
+import { formatCurrency } from "@/lib/utils";
 import { Plus, Package } from "lucide-react";
 import type { Product } from "@/types/database";
 
