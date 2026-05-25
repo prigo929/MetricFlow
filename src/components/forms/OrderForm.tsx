@@ -16,7 +16,7 @@ import type { Company, Product, UserProfile } from "@/types/database";
 
 interface Props {
   companies: Pick<Company, "id" | "name">[];
-  products:  Pick<Product, "id" | "name" | "sku" | "unit_price">[];
+  products:  Pick<Product, "id" | "name" | "sku" | "unit_price" | "stock_qty">[];
   users:     Pick<UserProfile, "id" | "full_name">[];
   currentUserId: string;
 }
@@ -52,6 +52,19 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
 
   const onSubmit: SubmitHandler<OrderFormValues> = async (values) => {
     setServerError(null);
+
+    // Validate stock levels before placing the order
+    const overStockItem = values.items.find((item) => {
+      const p = products.find((prod) => prod.id === item.product_id);
+      return p && (Number(item.quantity) || 0) > p.stock_qty;
+    });
+
+    if (overStockItem) {
+      const p = products.find((prod) => prod.id === overStockItem.product_id);
+      setServerError(`Cannot place order: "${p?.name}" has only ${p?.stock_qty} units in stock.`);
+      return;
+    }
+
     const result = await createOrder(values);
     if (!result.success) { setServerError(result.error); return; }
     router.push(`/orders/${result.data.id}`);
@@ -119,7 +132,11 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
                 <Select
                   label={index === 0 ? "Product" : undefined}
                   {...register(`items.${index}.product_id`)}
-                  options={products.map((p) => ({ value: p.id, label: `${p.name} (${p.sku})` }))}
+                  options={products.map((p) => ({
+                    value: p.id,
+                    label: `${p.name} (${p.sku}) — ${p.stock_qty > 0 ? `[Stock: ${p.stock_qty}]` : "[OUT OF STOCK]"}`,
+                    disabled: p.stock_qty <= 0,
+                  }))}
                   placeholder="Select product…"
                   onChange={(e) => {
                     register(`items.${index}.product_id`).onChange(e);
@@ -127,9 +144,21 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
                   }}
                 />
               </div>
-              <div className="col-span-2">
+              <div className="col-span-2 relative pb-4">
                 <Input label={index === 0 ? "Qty" : undefined} type="number" min={1}
                   {...register(`items.${index}.quantity`)} placeholder="1" />
+                {(() => {
+                  const item = items[index];
+                  const prod = products.find((p) => p.id === item?.product_id);
+                  if (prod && (Number(item?.quantity) || 0) > prod.stock_qty) {
+                    return (
+                      <p className="text-[10px] text-amber-600 font-semibold absolute left-0 bottom-0 truncate w-full">
+                        Max {prod.stock_qty} left!
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
               <div className="col-span-3">
                 <Input label={index === 0 ? "Unit Price (€)" : undefined} type="number" step="0.01"

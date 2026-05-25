@@ -15,7 +15,7 @@ export default async function NewOrderPage() {
 
   const [{ data: companies }, { data: products }, { data: users }] = await Promise.all([
     (supabase as any).from("companies").select("id, name").order("name"),
-    (supabase as any).from("products").select("id, name, sku, unit_price").eq("is_active", true).order("name"),
+    (supabase as any).from("products").select("id, name, sku, unit_price, stock_qty").eq("is_active", true).order("name"),
     (supabase as any).from("user_profiles").select("id, full_name"),
   ]);
 
@@ -26,7 +26,7 @@ export default async function NewOrderPage() {
       </PageHeader>
       <OrderForm
         companies={(companies ?? []) as Pick<Company, "id" | "name">[]}
-        products={(products ?? []) as Pick<Product, "id" | "name" | "sku" | "unit_price">[]}
+        products={(products ?? []) as Pick<Product, "id" | "name" | "sku" | "unit_price" | "stock_qty">[]}
         users={(users ?? []) as Pick<UserProfile, "id" | "full_name">[]}
         currentUserId={user?.id ?? ""}
       />
