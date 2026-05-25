@@ -23,6 +23,7 @@ graph TD
         UI[React / Tailwind UI] --> Hooks[useToast / State Hooks]
         UI --> Charts[Recharts Visualization]
         UI --> Export[CSV Flattening Engine]
+        UI --> Forms[React Hook Form / Zod Client Validation]
     end
 
     subgraph Application Layer [Next.js Server App Router]
@@ -94,9 +95,10 @@ Instead of running calculations in JavaScript, MetricFlow handles analytics dire
 
 ---
 
-### 2. Access Control & Row-Level Security (RLS)
-Data security is enforced directly at the database layer. Even if an attacker compromises the API client keys, they cannot retrieve unauthorized rows because Supabase applies RLS criteria on every SQL compilation.
+### 2. Access Control, RLS & Middleware Routing
 
+#### A. Row-Level Security (RLS) Policies
+Data security is enforced directly at the database layer. Even if an attacker compromises the API client keys, they cannot retrieve unauthorized rows because Supabase applies RLS criteria on every SQL compilation.
 *   **Order Isolation**: Sales representatives can only view and manage orders explicitly assigned to them (`assigned_to = auth.uid()`). System administrators override this restriction to manage all orders.
 *   **Role Promotion Guard**: User roles (`admin`, `sales_rep`, `viewer`) are stored in `user_profiles`. The application updates roles via a secure RPC PostgreSQL function (`update_user_role`). The function is designated as `SECURITY DEFINER` (allowing it to run with elevated privileges to modify profiles) but includes context validation to check that the calling user holds an admin role:
     ```plpgsql
@@ -107,6 +109,14 @@ Data security is enforced directly at the database layer. Even if an attacker co
       raise exception 'Access Denied: Only admins can manage roles';
     end if;
     ```
+
+#### B. Edge Middleware & Auth Session Refresh Loop
+MetricFlow uses Next.js Middleware (`src/middleware.ts` calling `src/lib/supabase/middleware.ts`) to manage authentication sessions at the network edge:
+1.  **Cookie Interception**: The middleware intercepts every request (excluding static assets, images, and favicons) and initializes an isolated `@supabase/ssr` server client using request cookies.
+2.  **Session Refresh**: It executes `supabase.auth.getUser()`. If the user's access token (JWT) is expired but a valid refresh token exists, Supabase automatically generates new session cookies. The middleware writes these back into both the request headers (so downstream Server Components receive the refreshed credentials) and the response cookies (updating the user's browser).
+3.  **Route Guarding**:
+    - **Protected Routes**: If no active user session is found and the path belongs to the app dashboard, the request is redirected to `/login`, appending the original path as a query parameter (`redirectTo`) to enable redirect-back behavior.
+    - **Guest Routes**: If a logged-in user attempts to navigate to public guest portals (`/login`, `/register`), the middleware intercepts the transaction and redirects them to `/dashboard`.
 
 ---
 
@@ -119,11 +129,41 @@ For regulatory compliance, MetricFlow implements an automated audit trail for co
 
 ### 4. Advanced UX & Performance Systems
 
-*   **Pagination & Range Slicing**: To ensure low page-load times, lists are requested from Supabase in ranges (e.g. `.range(0, 9)` for page 1). Table filter updates automatically reset pagination to page 1 to prevent rendering empty lists.
+#### A. Zero-Fill Chronological Chart Aggregation
+Standard databases only record transactions when orders occur. This creates a data visualization issue: a company with sales on Monday and Friday, but none in between, will render a chart that skips Tuesday, Wednesday, and Thursday entirely, causing a misleading slope.
+*   **The Solution**: MetricFlow implements a zero-fill alignment algorithm in `src/lib/utils/aggregation.ts`.
+*   **How it works**: 
+    1. The function determines the bounds of the selected range (7 days, 30 days, or 12 months).
+    2. It pre-populates a local JS object with every chronological key in that range (e.g. daily dates or monthly descriptors) initialized with `0` values.
+    3. It then iterates over the fetched order history, aggregating totals into their corresponding keys.
+    4. Finally, it sorts the keys chronologically, outputting a complete, gap-free array (e.g., a solid 30-day timeline) to feed the Recharts component.
+
+#### B. Strict Form Validation & Preemptive Stock Checks
+Forms in MetricFlow use React Hook Form combined with Zod schema verification (`src/lib/validations/schemas.ts`) to prevent bad data from reaching Server Actions:
+*   **Dynamic Casts**: Handles conversions (such as turning string inputs into numbers via Zod's `z.coerce.number()` or processing empty inputs to SQL-friendly `null` values via preprocessing).
+*   **Preemptive Stock Check Alerting**: Inside [OrderForm.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/forms/OrderForm.tsx), product dropdown selectors display the available inventory count. If an item has zero stock, its selection is disabled in the client UI. If a user sets an order quantity greater than the warehouse stock count, the form renders a real-time warning label (`Max X left!`).
+*   **Checkout Stock Block**: On submission, the client-side code iterates over the proposed items list. If any quantity exceeds database-reported stock availability:
+    - Submission is halted immediately.
+    - A descriptive warning banner is injected at the bottom of the form.
+    - A Radix UI Toast warning notification is launched.
+    - The Server Action is blocked, preventing unnecessary roundtrips to the database and preserving API resources.
+
+#### C. Relational Data Flattening (CSV Export Engine)
+Exporting JSON arrays directly to spreadsheets leads to unreadable cells when records contain nested relationships (such as a company object nested inside an order record).
+*   **How it works**: The custom client-side `ExportButton` component implements a key extraction filter:
+    1. It strips standard database IDs (`id`, `company_id`, `assigned_to`) from the header list.
+    2. It loops through the dataset and dynamically parses each field.
+    3. If it encounters a nested object, it checks for descriptive labels (e.g. `.name` or `.full_name`). It flattens this information into a simple string (extracting the company name or representative's name) rather than writing `[object Object]` into the cell.
+    4. The data is converted into a standard comma-separated text string, packaged into a Blob, and downloaded directly via a temporary browser anchor link.
+
+#### D. SSR Hydration & Cookie Security
+Next.js Server Components inside MetricFlow render pages directly on the server before transferring HTML to the browser.
+*   **How it works**: Server-side page files instantiate the Supabase Server Client using headers and cookies. By using cookies as the storage mechanism for session JWTs, the application does not need to expose Supabase endpoint URLs or authentication tokens to the client-side JavaScript bundle, making the site highly secure against Cross-Site Scripting (XSS) token harvesting.
+
+#### E. Other UX Details:
+*   **Pagination & Range Slicing**: Lists are requested from Supabase in ranges (e.g. `.range(0, 9)` for page 1). Table filter updates automatically reset pagination to page 1 to prevent rendering empty lists.
 *   **Dynamic sorting**: Columns support click-to-sort headers. They append `sort` and `order` parameters to the URL query string, triggering database-level ordering (`.order()`) on query executions.
-*   **Layout Shift Prevention**: Hardcoded CSS percentage widths are defined on table headers (`w-[30%]`, `w-[20%]`, etc.) to lock column sizes. This prevents jarring horizontal movements when pages load or filter results change.
-*   **Client Toast Feed**: Utilizes Radix UI Toast primitives to notify users about form submissions, validation failures, database update errors, or stockout warnings.
-*   **CSV Exporter with Relation Flattening**: Next.js client code extracts and flattens database relationships (e.g., mapping `company.name` and `assigned_user.full_name` from nested objects) into clean tabular columns, bypassing pagination range limits to export the full filtered dataset.
+*   **Layout Shift Prevention**: Hardcoded CSS percentage widths are defined on table headers (`w-[30%]`, `w-[20%]`, etc.) to lock column sizes. This prevents horizontal movements when pages load or filter results change.
 
 ---
 
