@@ -43,7 +43,7 @@ graph TD
 
 ### 1. Database Schema Design (Entity-Relationship Model)
 The system is built on a highly normalized PostgreSQL schema optimized with specific indexes for frequent search operations:
-*   **`user_profiles`**: Extends Supabase's `auth.users` table with application metadata (full name, avatar, and roles). Profiles are created automatically via a database trigger (`on_auth_user_created`) when users sign up.
+*   **`user_profiles`**: Extends Supabase's `auth.users` table with application level profile data. Created automatically via a database trigger (`on_auth_user_created`) when users sign up.
 *   **`companies`**: Holds B2B clients, segmented by `tier` (`smb`, `mid_market`, `enterprise`), industry, and financial metrics.
 *   **`contacts`**: Stores company-associated individuals. Multiple contacts can link to a company, with one flagged as `is_primary` to streamline order inquiries.
 *   **`products`**: Maintains inventory items, categorized with SKU enforcement, stock levels, and category groupings.
@@ -74,7 +74,7 @@ Instead of running calculations in JavaScript, MetricFlow handles analytics dire
     *   *Loyal Customers* (R $\ge$ 3, F $\ge$ 1, M $\ge$ 3)
     *   *At Risk* (R $\le$ 2, F $\ge$ 2, M $\ge$ 2)
     *   *Lost / Hibernating* (R $\le$ 2, F $\le$ 2)
-*   **UI Presentation**: Visualized in Recharts via `RfmSegmentChart` (a responsive horizontal bar chart) and a detailed filterable data matrix (`RfmDetailsTable`).
+*   **UI Presentation**: Visualized in Recharts via `RfmSegmentChart` (a responsive horizontal bar chart) and a detailed filterable data matrix (`RfmDetailsTable`) located under the route directory components.
 
 #### B. Automated Churn Risk Detection (`v_churn_risk`)
 *   **The Theory**: Customer churn is a lagging indicator. To address it preemptively, MetricFlow monitors each client's purchasing cadence (average days between orders) and flags sudden drops in activity.
@@ -141,7 +141,7 @@ Standard databases only record transactions when orders occur. This creates a da
 #### B. Strict Form Validation & Preemptive Stock Checks
 Forms in MetricFlow use React Hook Form combined with Zod schema verification (`src/lib/validations/schemas.ts`) to prevent bad data from reaching Server Actions:
 *   **Dynamic Casts**: Handles conversions (such as turning string inputs into numbers via Zod's `z.coerce.number()` or processing empty inputs to SQL-friendly `null` values via preprocessing).
-*   **Preemptive Stock Check Alerting**: Inside [OrderForm.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/forms/OrderForm.tsx), product dropdown selectors display the available inventory count. If an item has zero stock, its selection is disabled in the client UI. If a user sets an order quantity greater than the warehouse stock count, the form renders a real-time warning label (`Max X left!`).
+*   **Preemptive Stock Check Alerting**: Inside `OrderForm.tsx`, product dropdown selectors display the available inventory count. If an item has zero stock, its selection is disabled in the client UI. If a user sets an order quantity greater than the warehouse stock count, the form renders a real-time warning label (`Max X left!`).
 *   **Checkout Stock Block**: On submission, the client-side code iterates over the proposed items list. If any quantity exceeds database-reported stock availability:
     - Submission is halted immediately.
     - A descriptive warning banner is injected at the bottom of the form.
@@ -160,10 +160,45 @@ Exporting JSON arrays directly to spreadsheets leads to unreadable cells when re
 Next.js Server Components inside MetricFlow render pages directly on the server before transferring HTML to the browser.
 *   **How it works**: Server-side page files instantiate the Supabase Server Client using headers and cookies. By using cookies as the storage mechanism for session JWTs, the application does not need to expose Supabase endpoint URLs or authentication tokens to the client-side JavaScript bundle, making the site highly secure against Cross-Site Scripting (XSS) token harvesting.
 
-#### E. Other UX Details:
-*   **Pagination & Range Slicing**: Lists are requested from Supabase in ranges (e.g. `.range(0, 9)` for page 1). Table filter updates automatically reset pagination to page 1 to prevent rendering empty lists.
-*   **Dynamic sorting**: Columns support click-to-sort headers. They append `sort` and `order` parameters to the URL query string, triggering database-level ordering (`.order()`) on query executions.
-*   **Layout Shift Prevention**: Hardcoded CSS percentage widths are defined on table headers (`w-[30%]`, `w-[20%]`, etc.) to lock column sizes. This prevents horizontal movements when pages load or filter results change.
+#### E. Component Co-location and Route Isolation
+To enforce route isolation and make the codebase highly maintainable:
+*   **Route-Specific Components**: Components that are only consumed by a single route folder are co-located in a `./components/` subdirectory directly inside that route. For example, `src/app/(dashboard)/analytics/components/` hosts view-specific RFM segmentation tables and graphs, and `src/app/(dashboard)/dashboard/components/` hosts top customer metrics.
+*   **Shared Primitives**: Only components that are consumed by multiple different routes (e.g., `RevenueChart.tsx` inside charts, or `Pagination.tsx` and `ExportButton.tsx` inside shared) are kept in the global components folder.
+
+---
+
+## 📂 Project Structure
+
+```text
+src/
+├── actions/             # Secure Next.js Server Actions (mutations & RPC executions)
+├── app/
+│   ├── (auth)/          # Authentication pages (Login, Register)
+│   ├── (dashboard)/     # Protected app pages
+│   │   ├── analytics/   # Analytics module (segment charts & RFM detail subcomponents)
+│   │   ├── dashboard/   # Dashboard module (top client & order status subcomponents)
+│   │   ├── loading.tsx  # Route-specific suspense skeleton screens
+│   │   └── error.tsx    # React error boundaries
+│   └── auth/callback/   # Supabase OAuth callback route handler
+├── components/
+│   ├── charts/          # Shared multi-route chart components (RevenueChart)
+│   ├── forms/           # React Hook Form + Zod validated forms
+│   ├── layout/          # Sidebar navigation, User profile dropdowns
+│   ├── shared/          # Reusable inputs, Pagination, ExportButton, TableFilters
+│   └── ui/              # Base UI primitives (buttons, inputs, cards, toast, etc.)
+├── hooks/               # Custom React hooks (use-toast, client state)
+├── lib/
+│   ├── supabase/        # Supabase client/server connection declarations & middleware
+│   ├── validations/     # Zod schemas for forms
+│   ├── utils.ts         # Formatting & styling helper functions (Tailwind cn, formatCurrency)
+│   └── analytics.ts     # Business logic analytical grouping & zero-fill timeline helpers
+└── types/               # Type systems declarations
+    ├── supabase.ts      # Auto-generated Typescript types directly from Supabase CLI
+    └── database.ts      # Derived type interfaces exported across components
+supabase/
+├── migrations/          # Incremental database migrations (schema, audit logs, analytics views)
+└── seed/                # Python scripts to seed the database with synthetic B2B data
+```
 
 ---
 
@@ -187,7 +222,13 @@ Deploy the migrations sequentially in your Supabase SQL Editor or through the Su
 2.  **Audit Logs & RBAC**: [supabase/migrations/002_audit_logs_and_roles.sql](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/supabase/migrations/002_audit_logs_and_roles.sql)
 3.  **Sales Intelligence Views**: [supabase/migrations/003_sales_intelligence.sql](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/supabase/migrations/003_sales_intelligence.sql)
 
-### 4. Seed Seed-Data
+### 4. Regenerate Database TypeScript Definitions
+To update TypeScript types whenever schema changes are deployed:
+```bash
+npx supabase gen types typescript --project-id your-project-id > src/types/supabase.ts
+```
+
+### 5. Seed Seed-Data
 To generate high-quality B2B dataset for demonstration:
 ```bash
 cd supabase/seed
@@ -196,7 +237,7 @@ python seed_data.py > seed.sql
 ```
 *Note: Open `seed.sql`, replace `ADMIN_USER_ID` references with your authenticated User ID, and run the SQL script in your Supabase editor.*
 
-### 5. Launch Development Server
+### 6. Launch Development Server
 ```bash
 npm run dev
 ```
