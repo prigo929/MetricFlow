@@ -37,6 +37,7 @@ export function TableFilters({
       } else {
         params.delete("q");
       }
+      params.delete("page"); // Reset pagination on search
       router.push(`${pathname}?${params.toString()}`);
     }, 300);
 
@@ -51,6 +52,7 @@ export function TableFilters({
     } else {
       params.delete(filterParamName!);
     }
+    params.delete("page"); // Reset pagination on filter change
     router.push(`${pathname}?${params.toString()}`);
   };
 

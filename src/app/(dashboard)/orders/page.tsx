@@ -8,6 +8,7 @@ import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
+import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency, formatDate } from "@/lib/utils/formatting";
 import { Plus, ShoppingCart } from "lucide-react";
 import type { Order, Company, UserProfile } from "@/types/database";
@@ -19,40 +20,95 @@ type OrderRow = Order & { company: Pick<Company, "name"> | null; assigned_user: 
 export default async function OrdersPage({
   searchParams,
 }: {
-  searchParams: { q?: string; status?: string };
+  searchParams: { q?: string; status?: string; page?: string; limit?: string };
 }) {
   const supabase = await createClient();
   
   const q = searchParams.q || "";
   const status = searchParams.status || "";
+  const page = parseInt(searchParams.page || "1", 10);
+  const limit = parseInt(searchParams.limit || "10", 10);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-  const { data } = await (supabase as any)
+  let companyIds: string[] = [];
+  let userIds: string[] = [];
+
+  if (q) {
+    const { data: companies } = await (supabase as any)
+      .from("companies")
+      .select("id")
+      .ilike("name", `%${q}%`);
+    if (companies) {
+      companyIds = companies.map((c: any) => c.id);
+    }
+
+    const { data: users } = await (supabase as any)
+      .from("user_profiles")
+      .select("id")
+      .ilike("full_name", `%${q}%`);
+    if (users) {
+      userIds = users.map((u: any) => u.id);
+    }
+  }
+
+  // Build paginated query
+  let listQuery = (supabase as any)
     .from("orders")
-    .select("*, company:companies(name), assigned_user:user_profiles(full_name)")
-    .order("order_date", { ascending: false });
-
-  let orders = (data ?? []) as OrderRow[];
-  const isFiltered = !!(q || status);
+    .select("*, company:companies(name), assigned_user:user_profiles(full_name)", { count: "exact" });
 
   if (status) {
-    orders = orders.filter((o) => o.status === status);
+    listQuery = listQuery.eq("status", status);
   }
 
   if (q) {
-    const searchLower = q.toLowerCase();
-    orders = orders.filter(
-      (o) =>
-        o.order_number.toLowerCase().includes(searchLower) ||
-        (o.company?.name ?? "").toLowerCase().includes(searchLower) ||
-        (o.assigned_user?.full_name ?? "").toLowerCase().includes(searchLower)
-    );
+    const conditions = [`order_number.ilike.%${q}%`];
+    if (companyIds.length > 0) {
+      conditions.push(`company_id.in.(${companyIds.join(",")})`);
+    }
+    if (userIds.length > 0) {
+      conditions.push(`assigned_to.in.(${userIds.join(",")})`);
+    }
+    listQuery = listQuery.or(conditions.join(","));
   }
+
+  const { data: listData, count } = await listQuery
+    .order("order_date", { ascending: false })
+    .range(from, to);
+
+  // Build export query (without limit/range)
+  let exportQuery = (supabase as any)
+    .from("orders")
+    .select("*, company:companies(name), assigned_user:user_profiles(full_name)");
+
+  if (status) {
+    exportQuery = exportQuery.eq("status", status);
+  }
+
+  if (q) {
+    const conditions = [`order_number.ilike.%${q}%`];
+    if (companyIds.length > 0) {
+      conditions.push(`company_id.in.(${companyIds.join(",")})`);
+    }
+    if (userIds.length > 0) {
+      conditions.push(`assigned_to.in.(${userIds.join(",")})`);
+    }
+    exportQuery = exportQuery.or(conditions.join(","));
+  }
+
+  const { data: exportData } = await exportQuery.order("order_date", { ascending: false });
+
+  const orders = (listData ?? []) as OrderRow[];
+  const exportOrders = (exportData ?? []) as OrderRow[];
+  const totalItems = count ?? 0;
+  const totalPages = Math.ceil(totalItems / limit);
+  const isFiltered = !!(q || status);
 
   return (
     <div>
-      <PageHeader title="Orders" subtitle={`${orders.length} orders total`}>
+      <PageHeader title="Orders" subtitle={`${totalItems} orders total`}>
         <div className="flex gap-2">
-          <ExportButton data={orders} filename="orders" />
+          <ExportButton data={exportOrders} filename="orders" />
           <Link href="/orders/new"><Button><Plus size={16} />New Order</Button></Link>
         </div>
       </PageHeader>
@@ -108,6 +164,12 @@ export default async function OrdersPage({
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={limit}
+            totalItems={totalItems}
+          />
         </Card>
       )}
     </div>

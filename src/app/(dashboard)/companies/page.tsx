@@ -8,6 +8,7 @@ import { TierBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
+import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { Plus, Building2, Globe } from "lucide-react";
 import type { Company } from "@/types/database";
@@ -17,31 +18,50 @@ export const metadata: Metadata = { title: "Companies" };
 export default async function CompaniesPage({
   searchParams,
 }: {
-  searchParams: { q?: string; tier?: string };
+  searchParams: { q?: string; tier?: string; page?: string; limit?: string };
 }) {
   const supabase = await createClient();
   
   const q = searchParams.q || "";
   const tier = searchParams.tier || "";
+  const page = parseInt(searchParams.page || "1", 10);
+  const limit = parseInt(searchParams.limit || "10", 10);
+  const from = (page - 1) * limit;
+  const to = from + limit - 1;
 
-  let query = (supabase as any).from("companies").select("*");
-  
+  // Build paginated query
+  let listQuery = (supabase as any).from("companies").select("*", { count: "exact" });
   if (q) {
-    query = query.ilike("name", `%${q}%`);
+    listQuery = listQuery.ilike("name", `%${q}%`);
   }
   if (tier) {
-    query = query.eq("tier", tier);
+    listQuery = listQuery.eq("tier", tier);
   }
+  const { data: listData, count } = await listQuery
+    .order("created_at", { ascending: false })
+    .range(from, to);
 
-  const { data } = await query.order("created_at", { ascending: false });
-  const companies = (data ?? []) as Company[];
+  // Build export query (without limit/range)
+  let exportQuery = (supabase as any).from("companies").select("*");
+  if (q) {
+    exportQuery = exportQuery.ilike("name", `%${q}%`);
+  }
+  if (tier) {
+    exportQuery = exportQuery.eq("tier", tier);
+  }
+  const { data: exportData } = await exportQuery.order("created_at", { ascending: false });
+
+  const companies = (listData ?? []) as Company[];
+  const exportCompanies = (exportData ?? []) as Company[];
+  const totalItems = count ?? 0;
+  const totalPages = Math.ceil(totalItems / limit);
   const isFiltered = !!(q || tier);
 
   return (
     <div>
-      <PageHeader title="Companies" subtitle={`${companies.length} companies in your CRM`}>
+      <PageHeader title="Companies" subtitle={`${totalItems} companies in your CRM`}>
         <div className="flex gap-2">
-          <ExportButton data={companies} filename="companies" />
+          <ExportButton data={exportCompanies} filename="companies" />
           <Link href="/companies/new"><Button><Plus size={16} />Add Company</Button></Link>
         </div>
       </PageHeader>
@@ -102,6 +122,12 @@ export default async function CompaniesPage({
               </tbody>
             </table>
           </div>
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            pageSize={limit}
+            totalItems={totalItems}
+          />
         </Card>
       )}
     </div>
