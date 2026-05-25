@@ -6,22 +6,46 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { TableFilters } from "@/components/shared/TableFilters";
 import { formatCurrency, formatDate } from "@/lib/utils/formatting";
 import { Plus, ShoppingCart } from "lucide-react";
 import type { Order, Company, UserProfile } from "@/types/database";
 
 export const metadata: Metadata = { title: "Orders" };
 
-type OrderRow = Order & { company: Pick<Company,"name"> | null; assigned_user: Pick<UserProfile,"full_name"> | null };
+type OrderRow = Order & { company: Pick<Company, "name"> | null; assigned_user: Pick<UserProfile, "full_name"> | null };
 
-export default async function OrdersPage() {
+export default async function OrdersPage({
+  searchParams,
+}: {
+  searchParams: { q?: string; status?: string };
+}) {
   const supabase = await createClient();
+  
+  const q = searchParams.q || "";
+  const status = searchParams.status || "";
+
   const { data } = await (supabase as any)
     .from("orders")
     .select("*, company:companies(name), assigned_user:user_profiles(full_name)")
-    .order("order_date", { ascending: false })
-    .limit(100);
-  const orders = (data ?? []) as OrderRow[];
+    .order("order_date", { ascending: false });
+
+  let orders = (data ?? []) as OrderRow[];
+  const isFiltered = !!(q || status);
+
+  if (status) {
+    orders = orders.filter((o) => o.status === status);
+  }
+
+  if (q) {
+    const searchLower = q.toLowerCase();
+    orders = orders.filter(
+      (o) =>
+        o.order_number.toLowerCase().includes(searchLower) ||
+        (o.company?.name ?? "").toLowerCase().includes(searchLower) ||
+        (o.assigned_user?.full_name ?? "").toLowerCase().includes(searchLower)
+    );
+  }
 
   return (
     <div>
@@ -29,8 +53,31 @@ export default async function OrdersPage() {
         <Link href="/orders/new"><Button><Plus size={16} />New Order</Button></Link>
       </PageHeader>
 
+      <TableFilters
+        searchPlaceholder="Search orders by number, company, or rep..."
+        filterParamName="status"
+        filterPlaceholder="All Statuses"
+        filterOptions={[
+          { value: "draft", label: "Draft" },
+          { value: "pending", label: "Pending" },
+          { value: "confirmed", label: "Confirmed" },
+          { value: "processing", label: "Processing" },
+          { value: "shipped", label: "Shipped" },
+          { value: "delivered", label: "Delivered" },
+          { value: "cancelled", label: "Cancelled" },
+        ]}
+      />
+
       {!orders.length ? (
-        <EmptyState icon={ShoppingCart} title="No orders yet" description="Create your first order to start tracking sales." />
+        isFiltered ? (
+          <div className="text-center py-16 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <ShoppingCart className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+            <h3 className="text-lg font-semibold text-gray-900">No results found</h3>
+            <p className="text-sm text-gray-500 mt-1">Try adjusting your search query or status filters.</p>
+          </div>
+        ) : (
+          <EmptyState icon={ShoppingCart} title="No orders yet" description="Create your first order to start tracking sales." />
+        )
       ) : (
         <Card>
           <div className="overflow-x-auto">

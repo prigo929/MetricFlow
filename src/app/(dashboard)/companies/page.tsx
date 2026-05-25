@@ -6,16 +6,35 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { TierBadge } from "@/components/shared/StatusBadge";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { TableFilters } from "@/components/shared/TableFilters";
 import { formatCurrency } from "@/lib/utils/formatting";
 import { Plus, Building2, Globe } from "lucide-react";
 import type { Company } from "@/types/database";
 
 export const metadata: Metadata = { title: "Companies" };
 
-export default async function CompaniesPage() {
+export default async function CompaniesPage({
+  searchParams,
+}: {
+  searchParams: { q?: string; tier?: string };
+}) {
   const supabase = await createClient();
-  const { data } = await (supabase as any).from("companies").select("*").order("created_at", { ascending: false });
+  
+  const q = searchParams.q || "";
+  const tier = searchParams.tier || "";
+
+  let query = (supabase as any).from("companies").select("*");
+  
+  if (q) {
+    query = query.ilike("name", `%${q}%`);
+  }
+  if (tier) {
+    query = query.eq("tier", tier);
+  }
+
+  const { data } = await query.order("created_at", { ascending: false });
   const companies = (data ?? []) as Company[];
+  const isFiltered = !!(q || tier);
 
   return (
     <div>
@@ -23,8 +42,27 @@ export default async function CompaniesPage() {
         <Link href="/companies/new"><Button><Plus size={16} />Add Company</Button></Link>
       </PageHeader>
 
+      <TableFilters
+        searchPlaceholder="Search companies by name..."
+        filterParamName="tier"
+        filterPlaceholder="All Tiers"
+        filterOptions={[
+          { value: "enterprise", label: "Enterprise" },
+          { value: "mid_market", label: "Mid Market" },
+          { value: "smb", label: "SMB" },
+        ]}
+      />
+
       {!companies.length ? (
-        <EmptyState icon={Building2} title="No companies yet" description="Add your first B2B client to get started." />
+        isFiltered ? (
+          <div className="text-center py-16 bg-white border border-gray-200 rounded-xl shadow-sm">
+            <Building2 className="mx-auto h-12 w-12 text-gray-400 mb-3" />
+            <h3 className="text-lg font-semibold text-gray-900">No results found</h3>
+            <p className="text-sm text-gray-500 mt-1">Try adjusting your search query or tier filters.</p>
+          </div>
+        ) : (
+          <EmptyState icon={Building2} title="No companies yet" description="Add your first B2B client to get started." />
+        )
       ) : (
         <Card>
           <div className="overflow-x-auto">
