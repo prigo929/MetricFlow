@@ -74,6 +74,35 @@ export default async function DashboardPage({
     (supabase as any).from("products").select("id, name, stock_qty").eq("is_active", true).lt("stock_qty", 10),
   ]);
 
+  // Fetch Sales Intelligence alerts safely (degrades gracefully if migration 003 isn't run yet)
+  let churnAlerts: any[] = [];
+  let velocityAlerts: any[] = [];
+
+  try {
+    const { data: churnData, error: churnErr } = await (supabase as any)
+      .from("v_churn_risk")
+      .select("*")
+      .eq("is_at_risk", true);
+    if (!churnErr && churnData) {
+      churnAlerts = churnData;
+    }
+  } catch (e) {
+    console.warn("v_churn_risk query failed");
+  }
+
+  try {
+    const { data: velocityData, error: velErr } = await (supabase as any)
+      .from("v_product_velocity")
+      .select("*")
+      .lte("days_to_stockout", 14)
+      .order("days_to_stockout", { ascending: true });
+    if (!velErr && velocityData) {
+      velocityAlerts = velocityData;
+    }
+  } catch (e) {
+    console.warn("v_product_velocity query failed");
+  }
+
   // Compute month-over-month growth (keeps monthly context)
   const thisRevenue = (thisMonthOrders as any[] ?? []).reduce((s: number, o: any) => s + (o.total_amount ?? 0), 0);
   const lastRevenue = (lastMonthOrders as any[] ?? []).reduce((s: number, o: any) => s + (o.total_amount ?? 0), 0);
@@ -153,6 +182,63 @@ export default async function DashboardPage({
               </Link>
             </p>
           </div>
+        </div>
+      )}
+
+      {/* Sales Intelligence & Alerts Grid */}
+      {(churnAlerts.length > 0 || velocityAlerts.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Churn Risk Alerts */}
+          {churnAlerts.length > 0 && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-900 shadow-sm flex items-start gap-2.5">
+              <ShieldAlert className="text-red-600 mt-0.5 flex-shrink-0" size={18} />
+              <div className="w-full">
+                <p className="font-semibold text-sm">Churn Risk Alert: Inactive Clients</p>
+                <p className="text-red-700 text-xs mt-0.5 mb-3">
+                  The following accounts have exceeded their historical purchase cadence by 1.5x or more:
+                </p>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {churnAlerts.map((c) => (
+                    <div key={c.company_id} className="flex justify-between items-center text-xs bg-white/70 border border-red-100 p-2 rounded-lg">
+                      <Link href={`/companies/${c.company_id}`} className="font-bold hover:underline hover:text-brand-700">
+                        {c.company_name}
+                      </Link>
+                      <span className="text-[10px] bg-red-100 text-red-800 px-2 py-0.5 rounded-full font-semibold">
+                        {c.days_since_last_order}D inactive / {c.avg_days_between}D avg
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Predictive Stockouts */}
+          {velocityAlerts.length > 0 && (
+            <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl text-orange-900 shadow-sm flex items-start gap-2.5">
+              <ShieldAlert className="text-orange-600 mt-0.5 flex-shrink-0" size={18} />
+              <div className="w-full">
+                <p className="font-semibold text-sm">Predictive Stockout Alerts</p>
+                <p className="text-orange-700 text-xs mt-0.5 mb-3">
+                  Based on rolling 30-day velocity, these products will run out in less than 14 days:
+                </p>
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {velocityAlerts.map((p) => (
+                    <div key={p.product_id} className="flex justify-between items-center text-xs bg-white/70 border border-orange-100 p-2 rounded-lg">
+                      <Link href={`/products`} className="font-bold hover:underline hover:text-brand-700">
+                        {p.product_name}
+                      </Link>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                        p.days_to_stockout <= 3 ? "bg-red-100 text-red-800 animate-pulse" : "bg-orange-100 text-orange-800"
+                      }`}>
+                        {p.days_to_stockout === 0 ? "Depleted!" : `Depletes in ~${p.days_to_stockout} days`}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
