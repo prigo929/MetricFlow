@@ -13,6 +13,49 @@ MetricFlow implements a **database-centric architecture**. Rather than running h
 
 ---
 
+## 🎓 Beginner Developer's Learning Guide
+
+This codebase has been intentionally designed and extensively commented to serve as a comprehensive learning resource for beginner developers. Throughout the project, you will find detailed educational comments explaining not just **what** the code does, but **why** specific patterns, architectures, and performance choices were made.
+
+If you are new to programming, React, Next.js, or cloud databases, here is a guide mapping key engineering concepts to files where you can see them implemented:
+
+### Key Concepts & Learning Paths
+
+#### 1. React Server Components (RSC) vs. Client Components
+*   **Concept**: RSCs run entirely on the server to retrieve database records directly and render fast HTML, lowering the amount of JavaScript sent to client browsers. Client Components (marked with `"use client"` at the top) run in the browser and handle local states, mouse clicks, and typing input.
+*   **Where to study**:
+    *   [companies/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/companies/page.tsx) & [dashboard/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/dashboard/page.tsx): Study how Server Components fetch data using Supabase clients.
+    *   [CompanyForm.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/companies/components/CompanyForm.tsx): See how form fields, button loaders, and dynamic validation messages run in a browser-first Client Component.
+
+#### 2. Next.js App Router Pages & Search Parameters Routing
+*   **Concept**: Routing determines what URL paths load what code. We use query parameters (like `?q=search&page=2`) to share state between pages, allowing users to bookmark exact page configurations.
+*   **Where to study**:
+    *   [companies/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/companies/page.tsx): Explains Next.js `searchParams` parsing, base-10 parsing safety, and dynamic offset calculations (`(page - 1) * limit`).
+    *   [TableFilters.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/shared/TableFilters.tsx): Learn how client forms update parameters, debouncing input value changes to prevent database overload.
+
+#### 3. Advanced Relational Joins & Sub-queries in Supabase (PostgREST)
+*   **Concept**: PostgreSQL relationships connect models together. Since cloud databases are accessed via stateless API requests, we query parent records and their children in single, high-performance requests.
+*   **Where to study**:
+    *   [orders/[id]/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/orders/%5Bid%5D/page.tsx): Look at the sub-join selector `order_items(*, product:products(...))` mapping multiple levels of relations (Orders $\to$ Order Items $\to$ Products).
+    *   [orders/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/orders/page.tsx): Study how cross-table searches are resolved by first catching IDs in sub-queries, then joining them via OR conditions.
+
+#### 4. TypeScript Typings, Generics, and Mapped Types
+*   **Concept**: TypeScript guarantees type safety, catching bugs during development before they break in production. We can write generic utilities that dynamically modify data structures.
+*   **Where to study**:
+    *   [types/index.ts](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/types/index.ts): Study generics, database schema derivation types, and mapping structures like `NonNullableFields<T>`.
+
+#### 5. Safe Client Imports (Disabling Server-Side Rendering)
+*   **Concept**: Libraries that query browser globals (`window` or `document`) will crash when pre-rendered on the server since Node.js has no DOM. We lazy-load these libraries only on the browser.
+*   **Where to study**:
+    *   [analytics/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/analytics/page.tsx): Look at the `next/dynamic` imports with `{ ssr: false }` and skeletal layout animations.
+
+#### 6. Browser Memory Safety & Blob URLs
+*   **Concept**: Converting client memory objects into physical download attachments safely without causing memory leaks.
+*   **Where to study**:
+    *   [ExportButton.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/shared/ExportButton.tsx): Learn about JSON serialization, MIME types, `URL.createObjectURL()`, and garbage collection revocation.
+
+---
+
 ## 🏗 System Architecture & Data Flow
 
 MetricFlow utilizes a modern multi-tier web application architecture:
