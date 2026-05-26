@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { orderSchema } from "@/lib/validations/schemas";
 import type { OrderFormValues } from "@/lib/validations/schemas";
-import { createOrder } from "@/actions/orders";
+import { createOrder } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

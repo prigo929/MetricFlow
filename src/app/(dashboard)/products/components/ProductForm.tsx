@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { productSchema } from "@/lib/validations/schemas";
 import type { ProductFormValues } from "@/lib/validations/schemas";
-import { createProduct, updateProduct } from "@/actions/products";
+import { createProduct, updateProduct } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";

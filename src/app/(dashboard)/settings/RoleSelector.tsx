@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { updateUserRole } from "@/actions/users";
+import { updateUserRole } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 
 interface Props {

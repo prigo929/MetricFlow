@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { contactSchema } from "@/lib/validations/schemas";
 import type { ContactFormValues } from "@/lib/validations/schemas";
-import { createContact, updateContact } from "@/actions/contacts";
+import { createContact, updateContact } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";

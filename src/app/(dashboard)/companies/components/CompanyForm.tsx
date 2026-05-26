@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { companySchema } from "@/lib/validations/schemas";
-import { createCompany, updateCompany } from "@/actions/companies";
+import { createCompany, updateCompany } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
