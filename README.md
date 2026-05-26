@@ -84,15 +84,193 @@ graph TD
     end
 ```
 
-### 1. Database Schema Design (Entity-Relationship Model)
-The system is built on a highly normalized PostgreSQL schema optimized with specific indexes for frequent search operations:
-*   **`user_profiles`**: Extends Supabase's `auth.users` table with application level profile data. Created automatically via a database trigger (`on_auth_user_created`) when users sign up.
-*   **`companies`**: Holds B2B clients, segmented by `tier` (`smb`, `mid_market`, `enterprise`), industry, and financial metrics.
-*   **`contacts`**: Stores company-associated individuals. Multiple contacts can link to a company, with one flagged as `is_primary` to streamline order inquiries.
-*   **`products`**: Maintains inventory items, categorized with SKU enforcement, stock levels, and category groupings.
-*   **`orders`**: Captures sales records containing tracking numbers, status (`draft`, `pending`, `confirmed`, `processing`, `shipped`, `delivered`, `cancelled`), expected delivery dates, and monetary calculations.
-*   **`order_items`**: Junction table holding quantities, prices, and generated `line_total` values. A database trigger (`sync_order_total`) automatically recalculates the parent order's `total_amount` whenever items are inserted, updated, or deleted.
-*   **`audit_logs`**: Verifiable history table logging changes made to CRM and Order records.
+### 1. Database Schema & Data Dictionary (Relational Model)
+
+MetricFlow's core engine relies on a normalized PostgreSQL schema designed to guarantee referential integrity and optimized with specific indexes for query performance. Below is the complete data dictionary detailing each table's structure, constraints, and relational mappings:
+
+#### A. Table: `user_profiles`
+Extends Supabase's built-in `auth.users` table to maintain CRM-level user metadata and role permissions.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, `REFERENCES auth.users(id) ON DELETE CASCADE` | Connects system accounts to Supabase Auth profiles. |
+| `email` | `text` | NOT NULL | User's email address cached for quick profile queries. |
+| `full_name` | `text` | NOT NULL, DEFAULT `''` | User's full display name. |
+| `role` | `user_role` (enum) | NOT NULL, DEFAULT `'sales_rep'` | Roles: `'admin'`, `'sales_rep'`, `'viewer'`. |
+| `avatar_url` | `text` | Nullable | S3 bucket or external link to user image. |
+| `created_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Record creation timestamp. |
+| `updated_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Record modification timestamp. |
+
+*   **Associated Automation**: Trigger `on_auth_user_created` calls `handle_new_user()` on inserts to the core authentication tables.
+
+#### B. Table: `companies`
+Tracks client companies registered within the B2B CRM.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique company identifier. |
+| `name` | `text` | NOT NULL | Name of the B2B organization. |
+| `industry` | `text` | NOT NULL | Business industry segment. |
+| `country` | `text` | NOT NULL, DEFAULT `'Romania'` | Regional country location. |
+| `city` | `text` | Nullable | Regional city location. |
+| `tier` | `company_tier` (enum)| NOT NULL, DEFAULT `'smb'` | Tier classifications: `'smb'`, `'mid_market'`, `'enterprise'`. |
+| `annual_revenue`| `numeric(15,2)` | Nullable, CHECK `annual_revenue >= 0` | Client's reported financial status. |
+| `employee_count`| `integer` | Nullable, CHECK `employee_count >= 0` | Total personnel headcount. |
+| `website` | `text` | Nullable | Website address. |
+| `notes` | `text` | Nullable | Additional descriptive details. |
+| `created_by` | `uuid` | `REFERENCES user_profiles(id)` | Sales representative managing the relationship. |
+| `created_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date added to CRM. |
+| `updated_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Last updated date. |
+
+*   **Indexes**: 
+    - `idx_companies_tier` on `tier` (B-Tree index for quick filters)
+    - `idx_companies_country` on `country` (B-Tree index for regional metrics)
+*   **Associated Automation**: Triggers audit mutations (`audit_companies_trigger`) and updates timestamps.
+
+#### C. Table: `contacts`
+Tracks individual decision-makers or contacts associated with B2B companies.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique contact identifier. |
+| `company_id` | `uuid` | NOT NULL, `REFERENCES companies(id) ON DELETE CASCADE` | Parent company association. |
+| `full_name` | `text` | NOT NULL | Full name of the contact. |
+| `email` | `text` | NOT NULL | Email address. |
+| `phone` | `text` | Nullable | Contact number. |
+| `job_title` | `text` | Nullable | Position within their company. |
+| `is_primary` | `boolean` | NOT NULL, DEFAULT `false` | Flag indicating the primary contact for client orders. |
+| `created_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date created. |
+| `updated_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date modified. |
+
+*   **Indexes**: `idx_contacts_company` on `company_id` (Speeds up loading contacts in Company Detail screens)
+
+#### D. Table: `products`
+Maintains records of hardware, software, or services offered for order placement.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique product identifier. |
+| `name` | `text` | NOT NULL | Product model name. |
+| `sku` | `text` | NOT NULL, UNIQUE | Unique stock keeping unit. |
+| `category` | `product_category`| NOT NULL | Categories: `'software'`, `'hardware'`, `'services'`, etc. |
+| `description` | `text` | Nullable | Core product descriptions. |
+| `unit_price` | `numeric(10,2)` | NOT NULL, CHECK `unit_price > 0` | Cost per individual item unit. |
+| `stock_qty` | `integer` | NOT NULL, DEFAULT `0`, CHECK `stock_qty >= 0` | Available stock count in warehousing. |
+| `is_active` | `boolean` | NOT NULL, DEFAULT `true` | Visibility toggle for orders form catalog. |
+| `created_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date created. |
+| `updated_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date modified. |
+
+*   **Indexes**:
+    - `idx_products_category` on `category` (For indexing product listings)
+    - `idx_products_active` on `is_active` (Excludes inactive items from forms)
+
+#### E. Table: `orders`
+Logs general metadata for B2B transactional sales events.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique order identifier. |
+| `order_number` | `text` | NOT NULL, UNIQUE, DEFAULT `'ORD-' || (uuid)` | Tracking code for billing invoice references. |
+| `company_id` | `uuid` | NOT NULL, `REFERENCES companies(id)` | Purchasing company account. |
+| `assigned_to` | `uuid` | NOT NULL, `REFERENCES user_profiles(id)` | Sales rep in charge of managing order completion. |
+| `status` | `order_status` | NOT NULL, DEFAULT `'draft'` | Progress: `'draft'`, `'pending'`, `'confirmed'`, etc. |
+| `total_amount` | `numeric(15,2)` | NOT NULL, DEFAULT `0` | Recalculated sum of lines (re-syncs via triggers). |
+| `order_date` | `date` | NOT NULL, DEFAULT `current_date` | Placed order date. |
+| `expected_delivery`| `date` | Nullable | Planned shipping arrival date. |
+| `notes` | `text` | Nullable | Delivery guidelines notes. |
+| `created_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date registered. |
+| `updated_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Date updated. |
+
+*   **Indexes**:
+    - `idx_orders_company` on `company_id`
+    - `idx_orders_status` on `status`
+    - `idx_orders_date` on `order_date desc` (Speeds up listing chronologies)
+    - `idx_orders_assigned` on `assigned_to`
+*   **Associated Automation**: Trigger `sync_order_total` recalculates values. Audit triggers log mutations.
+
+#### F. Table: `order_items`
+Contains individual items purchased in an order, executing calculated stored fields.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique line item identifier. |
+| `order_id` | `uuid` | NOT NULL, `REFERENCES orders(id) ON DELETE CASCADE` | Connected parent order. |
+| `product_id` | `uuid` | NOT NULL, `REFERENCES products(id)` | Linked product record. |
+| `quantity` | `integer` | NOT NULL, CHECK `quantity > 0` | Quantity ordered. |
+| `unit_price` | `numeric(10,2)` | NOT NULL, CHECK `unit_price > 0` | Cost of product at purchase date. |
+| `line_total` | `numeric(15,2)` | GENERATED ALWAYS AS (`quantity * unit_price`) STORED | Database-calculated line total. |
+
+*   **Indexes**:
+    - `idx_order_items_order` on `order_id`
+    - `idx_order_items_product` on `product_id`
+
+#### G. Table: `audit_logs`
+Verifiable transaction history log for auditing updates.
+
+| Column | Data Type | Constraints / Flags | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `uuid` | Primary Key, DEFAULT `uuid_generate_v4()` | Unique log identifier. |
+| `table_name` | `text` | NOT NULL | Targeted table name (`companies` / `orders`). |
+| `action` | `text` | NOT NULL | Mutation action type: `'INSERT'`, `'UPDATE'`, `'DELETE'`. |
+| `record_id` | `uuid` | NOT NULL | Primary key of modified row. |
+| `old_data` | `jsonb` | Nullable | Snapshot of values *before* changes occurred. |
+| `new_data` | `jsonb` | Nullable | Snapshot of values *after* changes occurred. |
+| `changed_by` | `uuid` | `REFERENCES user_profiles(id) ON DELETE SET NULL` | ID of user executing action (`auth.uid()`). |
+| `changed_at` | `timestamptz`| NOT NULL, DEFAULT `now()` | Transaction execution timestamp. |
+
+---
+
+### 2. Database Triggers & Stored Procedures (PL/pgSQL Automation)
+
+MetricFlow utilizes PL/pgSQL database trigger functions to automate logic directly inside PostgreSQL, keeping data calculations safe from client-side network interruptions:
+
+#### A. Order Subtotal Recalculation Trigger (`sync_order_total`)
+Ensures that the parent order's `total_amount` is always in sync with its child order items. It runs automatically `AFTER INSERT OR UPDATE OR DELETE` on `order_items`:
+```sql
+create or replace function public.recalculate_order_total()
+returns trigger as $$
+begin
+  update public.orders
+  set
+    total_amount = (
+      select coalesce(sum(line_total), 0)
+      from public.order_items
+      where order_id = coalesce(new.order_id, old.order_id)
+    ),
+    updated_at = now()
+  where id = coalesce(new.order_id, old.order_id);
+  return coalesce(new, old);
+end;
+$$ language plpgsql;
+```
+
+#### B. CRM Audit Logging Trigger (`process_audit_log`)
+Monitors the `companies` and `orders` tables, capturing all updates, creations, and deletions, serializing old and new rows into JSON, and attributing the operation to the authenticated user ID (`auth.uid()`):
+```sql
+create or replace function public.process_audit_log()
+returns trigger as $$
+declare
+  current_user_id uuid;
+begin
+  current_user_id := auth.uid();
+
+  if (TG_OP = 'DELETE') then
+    insert into public.audit_logs (table_name, action, record_id, old_data, changed_by)
+    values (TG_TABLE_NAME, TG_OP, old.id, row_to_json(old)::jsonb, current_user_id);
+    return old;
+  elsif (TG_OP = 'UPDATE') then
+    insert into public.audit_logs (table_name, action, record_id, old_data, new_data, changed_by)
+    values (TG_TABLE_NAME, TG_OP, new.id, row_to_json(old)::jsonb, row_to_json(new)::jsonb, current_user_id);
+    return new;
+  elsif (TG_OP = 'INSERT') then
+    insert into public.audit_logs (table_name, action, record_id, new_data, changed_by)
+    values (TG_TABLE_NAME, TG_OP, new.id, row_to_json(new)::jsonb, current_user_id);
+    return new;
+  end if;
+  return null;
+end;
+$$ language plpgsql security definer;
+```
 
 ---
 
