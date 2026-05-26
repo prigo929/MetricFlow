@@ -1,7 +1,7 @@
 import { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { ContactForm } from "@/components/forms/ContactForm";
+import { ContactForm } from "../components/ContactForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";

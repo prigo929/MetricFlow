@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
-import { OrderForm } from "@/components/forms/OrderForm";
+import { OrderForm } from "../components/OrderForm";
 import { ArrowLeft } from "lucide-react";
 import type { Company, Product, UserProfile } from "@/types/database";
 

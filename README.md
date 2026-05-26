@@ -182,7 +182,6 @@ src/
 │   └── auth/callback/   # Supabase OAuth callback route handler
 ├── components/
 │   ├── charts/          # Shared multi-route chart components (RevenueChart)
-│   ├── forms/           # React Hook Form + Zod validated forms
 │   ├── layout/          # Sidebar navigation, User profile dropdowns
 │   ├── shared/          # Reusable inputs, Pagination, ExportButton, TableFilters
 │   └── ui/              # Base UI primitives (buttons, inputs, cards, toast, etc.)

@@ -1,6 +1,6 @@
 import { Metadata } from "next";
 import { PageHeader } from "@/components/shared/PageHeader";
-import { CompanyForm } from "@/components/forms/CompanyForm";
+import { CompanyForm } from "../components/CompanyForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
