@@ -11,7 +11,7 @@ import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { Plus, ShoppingCart, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import type { Order, Company, UserProfile } from "@/types/database";
+import type { Order, Company, UserProfile } from "@/types";
 
 export const metadata: Metadata = { title: "Orders" };
 

@@ -9,7 +9,7 @@ import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Globe, Users, Mail, Phone } from "lucide-react";
-import type { Company, Contact, Order } from "@/types/database";
+import type { Company, Contact, Order } from "@/types";
 
 export const metadata: Metadata = { title: "Company Detail" };
 

@@ -661,3 +661,93 @@ export const Constants = {
     },
   },
 } as const
+
+// ─── Custom UI type helpers (merged from database.ts) ────────────────────────
+
+// Helper to strip nullability/optionality from generated view row fields
+type NonNullableFields<T> = {
+  [K in keyof T]-?: NonNullable<T[K]>;
+};
+
+// Enums
+export type UserRole        = Database["public"]["Enums"]["user_role"];
+export type OrderStatus     = Database["public"]["Enums"]["order_status"];
+export type CompanyTier     = Database["public"]["Enums"]["company_tier"];
+export type ProductCategory = Database["public"]["Enums"]["product_category"];
+
+// Row types
+export type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
+export type Company     = Database["public"]["Tables"]["companies"]["Row"];
+export type Contact     = Database["public"]["Tables"]["contacts"]["Row"];
+export type Product     = Database["public"]["Tables"]["products"]["Row"];
+export type Order       = Database["public"]["Tables"]["orders"]["Row"];
+
+// Make line_total strictly number since it's a generated column that is always computed in practice
+export type OrderItem   = Omit<Database["public"]["Tables"]["order_items"]["Row"], "line_total"> & { line_total: number };
+
+// Insert types
+export type CompanyInsert   = Database["public"]["Tables"]["companies"]["Insert"];
+export type ContactInsert   = Database["public"]["Tables"]["contacts"]["Insert"];
+export type ProductInsert   = Database["public"]["Tables"]["products"]["Insert"];
+export type OrderInsert     = Database["public"]["Tables"]["orders"]["Insert"];
+export type OrderItemInsert = Database["public"]["Tables"]["order_items"]["Insert"];
+
+// Update types
+export type CompanyUpdate = Database["public"]["Tables"]["companies"]["Update"];
+export type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
+export type OrderUpdate   = Database["public"]["Tables"]["orders"]["Update"];
+
+// Joined types (for UI)
+export interface OrderWithCompany extends Order {
+  company: Pick<Company, "id" | "name" | "tier">;
+  assigned_user: Pick<UserProfile, "id" | "full_name" | "avatar_url">;
+}
+export interface OrderWithItems extends Order {
+  company: Pick<Company, "id" | "name">;
+  order_items: (OrderItem & { product: Pick<Product, "id" | "name" | "sku" | "category"> })[];
+}
+
+// Analytics types (Views)
+export type RevenueByMonth  = NonNullableFields<Database["public"]["Views"]["v_revenue_by_month"]["Row"]>;
+export type TopCustomer     = NonNullableFields<Database["public"]["Views"]["v_top_customers"]["Row"]>;
+export type ProductPerf     = NonNullableFields<Database["public"]["Views"]["v_product_performance"]["Row"]>;
+export type SalesByRep      = NonNullableFields<Database["public"]["Views"]["v_sales_by_rep"]["Row"]>;
+
+// ─── Common utility types (merged from common.ts) ──────────────────────────
+
+// Server Action return type — consistent shape for all mutations
+export type ActionResult<T = void> =
+  | { success: true; data: T; message?: string }
+  | { success: false; error: string; fieldErrors?: Record<string, string[]> };
+
+// Pagination
+export interface PaginationParams {
+  page: number;
+  pageSize: number;
+}
+
+export interface PaginatedResult<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+// Filter/sort
+export interface SortConfig {
+  column: string;
+  direction: "asc" | "desc";
+}
+
+// Generic select option (used in dropdowns)
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+// Date range filter
+export interface DateRange {
+  from: Date;
+  to: Date;
+}

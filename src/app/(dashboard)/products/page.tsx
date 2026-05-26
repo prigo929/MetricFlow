@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Package } from "lucide-react";
-import type { Product } from "@/types/database";
+import type { Product } from "@/types";
 
 export const metadata: Metadata = { title: "Products" };
 

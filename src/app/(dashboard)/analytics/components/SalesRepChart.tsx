@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from "recharts";
-import type { SalesByRep } from "@/types/database";
+import type { SalesByRep } from "@/types";
 
 interface Props { data: SalesByRep[] }
 

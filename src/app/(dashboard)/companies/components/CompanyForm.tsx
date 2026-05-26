@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Company } from "@/types/database";
+import type { Company } from "@/types";
 
 // Explicit form value type matching what the form fields produce
 interface CompanyFormData {

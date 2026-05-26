@@ -5,7 +5,7 @@ import { ProductForm } from "../components/ProductForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { Product } from "@/types/database";
+import type { Product } from "@/types";
 export default async function EditProductPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
   const { data } = await (supabase as any).from("products").select("*").eq("id", params.id).single();

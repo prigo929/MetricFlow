@@ -8,8 +8,8 @@ import {
   productSchema,
   orderSchema,
 } from "@/lib/validations/schemas";
-import type { ActionResult } from "@/types/common";
-import type { Company, Contact, Product, Order, OrderStatus } from "@/types/database";
+import type { ActionResult } from "@/types";
+import type { Company, Contact, Product, Order, OrderStatus } from "@/types";
 
 // ============================================================================
 // 🏢 Companies Server Actions

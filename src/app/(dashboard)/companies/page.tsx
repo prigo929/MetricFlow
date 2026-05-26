@@ -11,7 +11,7 @@ import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Building2, Globe, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import type { Company } from "@/types/database";
+import type { Company } from "@/types";
 
 export const metadata: Metadata = { title: "Companies" };
 

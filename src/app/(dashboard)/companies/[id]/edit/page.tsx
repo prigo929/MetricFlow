@@ -5,7 +5,7 @@ import { CompanyForm } from "../../components/CompanyForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { Company } from "@/types/database";
+import type { Company } from "@/types";
 
 export default async function EditCompanyPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Bell, LogOut, ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import type { UserProfile } from "@/types/database";
+import type { UserProfile } from "@/types";
 
 export default function TopBar({ user }: { user: UserProfile | null }) {
   const router = useRouter();

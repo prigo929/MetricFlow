@@ -9,7 +9,7 @@
 import type {
   Company, Contact, Product, Order, OrderItem,
   UserProfile, RevenueByMonth, TopCustomer, ProductPerf, SalesByRep,
-} from "@/types/database";
+} from "@/types";
 
 // These are type-only helpers — used for explicit casting in server actions & pages
 export type { Company, Contact, Product, Order, OrderItem, UserProfile };

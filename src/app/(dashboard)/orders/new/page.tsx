@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { Button } from "@/components/ui/button";
 import { OrderForm } from "../components/OrderForm";
 import { ArrowLeft } from "lucide-react";
-import type { Company, Product, UserProfile } from "@/types/database";
+import type { Company, Product, UserProfile } from "@/types";
 
 export const metadata: Metadata = { title: "New Order" };
 

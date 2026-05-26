@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { RoleSelector } from "./RoleSelector";
 import { AuditLogsList } from "./AuditLogsList";
 import { ShieldAlert, History, Users } from "lucide-react";
-import type { UserProfile } from "@/types/database";
+import type { UserProfile } from "@/types";
 
 export const metadata: Metadata = { title: "Settings" };
 

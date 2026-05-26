@@ -3,7 +3,7 @@ import { useState } from "react";
 import { updateOrderStatus } from "@/actions";
 import { Button } from "@/components/ui/button";
 import { ORDER_STATUS_CONFIG } from "@/lib/utils";
-import type { OrderStatus } from "@/types/database";
+import type { OrderStatus } from "@/types";
 
 const TRANSITIONS: Record<OrderStatus, OrderStatus | null> = {
   draft:       "pending",

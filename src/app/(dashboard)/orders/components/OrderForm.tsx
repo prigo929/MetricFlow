@@ -13,7 +13,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/lib/utils";
 import { Plus, Trash2 } from "lucide-react";
-import type { Company, Product, UserProfile } from "@/types/database";
+import type { Company, Product, UserProfile } from "@/types";
 
 interface Props {
   companies: Pick<Company, "id" | "name">[];

@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer
 } from "recharts";
-import type { ProductPerf } from "@/types/database";
+import type { ProductPerf } from "@/types";
 
 interface Props { data: ProductPerf[] }
 

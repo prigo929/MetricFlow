@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Contact, Company } from "@/types/database";
+import type { Contact, Company } from "@/types";
 
 interface Props {
   contact?: Contact;

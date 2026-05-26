@@ -6,7 +6,7 @@ import { OrderStatusBadge } from "@/components/shared/StatusBadge";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { FileText } from "lucide-react";
-import type { Order, Company } from "@/types/database";
+import type { Order, Company } from "@/types";
 
 export const metadata: Metadata = { title: "Reports" };
 

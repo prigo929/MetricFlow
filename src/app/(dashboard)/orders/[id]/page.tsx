@@ -9,7 +9,7 @@ import { OrderStatusUpdater } from "@/components/shared/OrderStatusUpdater";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import { ArrowLeft, Building2, User, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { Order, OrderItem, Company, Product, UserProfile } from "@/types/database";
+import type { Order, OrderItem, Company, Product, UserProfile } from "@/types";
 
 export const metadata: Metadata = { title: "Order Detail" };
 

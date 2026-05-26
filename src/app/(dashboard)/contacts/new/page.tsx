@@ -5,7 +5,7 @@ import { ContactForm } from "../components/ContactForm";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import type { Company } from "@/types/database";
+import type { Company } from "@/types";
 
 export const metadata: Metadata = { title: "New Contact" };
 

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/shared/EmptyState";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Badge } from "@/components/ui/badge";
 import { Mail, Phone, Plus, Users } from "lucide-react";
-import type { Contact, Company } from "@/types/database";
+import type { Contact, Company } from "@/types";
 
 export const metadata: Metadata = { title: "Contacts" };
 
