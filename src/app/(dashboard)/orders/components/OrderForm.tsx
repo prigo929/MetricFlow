@@ -35,17 +35,30 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
       status:     "draft",
       order_date: new Date().toISOString().split("T")[0],
       assigned_to: currentUserId,
+      // Default with exactly one empty line item row
       items: [{ product_id: "", quantity: 1, unit_price: 0 }],
     },
   });
 
+  /**
+   * WHAT IS useFieldArray?
+   * It's a react-hook-form hook specifically designed to manage list forms (dynamic arrays).
+   * It provides helper functions (`append`, `remove`) to add new lines or delete rows 
+   * in the DOM, maintaining performance and input focuses without manually rewriting state arrays.
+   */
   const { fields, append, remove } = useFieldArray({ control, name: "items" });
+  
+  // `watch` registers a listener on the "items" form fields.
+  // Whenever quantities or prices change, `items` updates, triggering a re-render 
+  // so we can compute the overall total in real time.
   const items = watch("items");
 
+  // Sum up quantity * unit_price for all line items reactively
   const orderTotal = items.reduce((sum, item) => {
     return sum + (Number(item.quantity) || 0) * (Number(item.unit_price) || 0);
   }, 0);
 
+  // Helper function to auto-fill the product unit price when a user selects a product in the dropdown
   const onProductChange = (index: number, productId: string) => {
     const product = products.find((p) => p.id === productId);
     if (product) setValue(`items.${index}.unit_price`, product.unit_price);
@@ -54,7 +67,8 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
   const onSubmit: SubmitHandler<OrderFormValues> = async (values) => {
     setServerError(null);
 
-    // Validate stock levels before placing the order
+    // CLIENT-SIDE VALIDATION: Verify stock availability before sending the payload
+    // We check if the quantity requested for any item exceeds its available stock count.
     const overStockItem = values.items.find((item) => {
       const p = products.find((prod) => prod.id === item.product_id);
       return p && (Number(item.quantity) || 0) > p.stock_qty;
@@ -139,6 +153,7 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle>Line Items</CardTitle>
+            {/* `append` inserts a new empty object row structure into the form array list */}
             <Button
               type="button" size="sm" variant="outline"
               onClick={() => append({ product_id: "", quantity: 1, unit_price: 0 })}
@@ -156,11 +171,13 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
                   {...register(`items.${index}.product_id`)}
                   options={products.map((p) => ({
                     value: p.id,
+                    // If a product is out of stock, render OUT OF STOCK text, and disable selection
                     label: `${p.name} (${p.sku}) — ${p.stock_qty > 0 ? `[Stock: ${p.stock_qty}]` : "[OUT OF STOCK]"}`,
                     disabled: p.stock_qty <= 0,
                   }))}
                   placeholder="Select product…"
                   onChange={(e) => {
+                    // Triggers hook-form's default onChange handler first, then syncs price fields
                     register(`items.${index}.product_id`).onChange(e);
                     onProductChange(index, e.target.value);
                   }}
@@ -169,6 +186,7 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
               <div className="col-span-2 relative pb-4">
                 <Input label={index === 0 ? "Qty" : undefined} type="number" min={1}
                   {...register(`items.${index}.quantity`)} placeholder="1" />
+                {/* Dynamically render a warn label if selected quantity exceeds product stock */}
                 {(() => {
                   const item = items[index];
                   const prod = products.find((p) => p.id === item?.product_id);
@@ -193,6 +211,7 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
               </div>
               <div className="col-span-1 pb-1">
                 {fields.length > 1 && (
+                  // `remove(index)` deletes the row from hook form state
                   <button type="button" onClick={() => remove(index)}
                     className={`p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded ${index === 0 ? "mt-5" : ""}`}>
                     <Trash2 size={14} />
@@ -228,3 +247,4 @@ export function OrderForm({ companies, products, users, currentUserId }: Props) 
     </form>
   );
 }
+

@@ -664,50 +664,84 @@ export const Constants = {
 
 // ─── Custom UI type helpers (merged from database.ts) ────────────────────────
 
-// Helper to strip nullability/optionality from generated view row fields
+/**
+ * WHAT IS A MAPPED TYPE?
+ * `NonNullableFields<T>` is a custom TypeScript utility type. It loops through all keys `K`
+ * of a given type `T` and strips out `null` and `undefined` markers using `NonNullable<T[K]>`.
+ *
+ * WHY DO WE NEED IT?
+ * Our Supabase Views (like analytical views) have columns marked as potentially `null` because 
+ * of outer joins. However, in our UI we know they are computed and always present. This type
+ * saves us from writing `data.revenue!` or `data.revenue ?? 0` everywhere in chart components.
+ */
 type NonNullableFields<T> = {
   [K in keyof T]-?: NonNullable<T[K]>;
 };
 
-// Enums
+// --- Enums ---
+// Extract union string literal types directly from our Postgres enum definitions.
+// Example: UserRole becomes exactly "admin" | "sales_rep" | "viewer".
 export type UserRole        = Database["public"]["Enums"]["user_role"];
 export type OrderStatus     = Database["public"]["Enums"]["order_status"];
 export type CompanyTier     = Database["public"]["Enums"]["company_tier"];
 export type ProductCategory = Database["public"]["Enums"]["product_category"];
 
-// Row types
+// --- Row Types ---
+// Row types represent the shape of a record when we fetch (SELECT) it from the database tables.
 export type UserProfile = Database["public"]["Tables"]["user_profiles"]["Row"];
 export type Company     = Database["public"]["Tables"]["companies"]["Row"];
 export type Contact     = Database["public"]["Tables"]["contacts"]["Row"];
 export type Product     = Database["public"]["Tables"]["products"]["Row"];
 export type Order       = Database["public"]["Tables"]["orders"]["Row"];
 
-// Make line_total strictly number since it's a generated column that is always computed in practice
+// WHAT IS Omit<T, K>?
+// `Omit` is a built-in TypeScript utility that creates a new type by taking all properties
+// of `T` and removing the specified keys `K`.
+//
+// Here, we take the default generated `order_items` Row type, remove the `line_total` field 
+// (which is nullable in database schemas because it's a generated virtual column), and force it 
+// to be a strict non-nullable `number` so our calculations don't throw type errors.
 export type OrderItem   = Omit<Database["public"]["Tables"]["order_items"]["Row"], "line_total"> & { line_total: number };
 
-// Insert types
+// --- Insert Types ---
+// Insert types represent the fields required/allowed when creating (INSERT) a new record.
+// Fields with default values (like `id` or `created_at`) are automatically marked as optional.
 export type CompanyInsert   = Database["public"]["Tables"]["companies"]["Insert"];
 export type ContactInsert   = Database["public"]["Tables"]["contacts"]["Insert"];
 export type ProductInsert   = Database["public"]["Tables"]["products"]["Insert"];
 export type OrderInsert     = Database["public"]["Tables"]["orders"]["Insert"];
 export type OrderItemInsert = Database["public"]["Tables"]["order_items"]["Insert"];
 
-// Update types
+// --- Update Types ---
+// Update types represent the fields we can modify (UPDATE) on an existing record.
+// All fields are marked as optional, so we can send only the columns that changed.
 export type CompanyUpdate = Database["public"]["Tables"]["companies"]["Update"];
 export type ProductUpdate = Database["public"]["Tables"]["products"]["Update"];
 export type OrderUpdate   = Database["public"]["Tables"]["orders"]["Update"];
 
-// Joined types (for UI)
+// --- Joined Types (for UI components) ---
+// When we query Supabase using joins (e.g., fetching an order and its associated company name),
+// the return type is a combination of the base Order row and nesting related records.
+
+/**
+ * WHAT IS Pick<T, K>?
+ * `Pick` creates a new type by selecting only the set of keys `K` from type `T`.
+ *
+ * Here, `OrderWithCompany` represents an Order record that also includes a nested `company` object
+ * containing only the company's `id`, `name`, and `tier`, plus the user profile of the assigned rep.
+ */
 export interface OrderWithCompany extends Order {
   company: Pick<Company, "id" | "name" | "tier">;
   assigned_user: Pick<UserProfile, "id" | "full_name" | "avatar_url">;
 }
+
 export interface OrderWithItems extends Order {
   company: Pick<Company, "id" | "name">;
+  // An array of order items where each item also includes its related product's core details
   order_items: (OrderItem & { product: Pick<Product, "id" | "name" | "sku" | "category"> })[];
 }
 
-// Analytics types (Views)
+// --- Analytics Types (Derived from Views) ---
 export type RevenueByMonth  = NonNullableFields<Database["public"]["Views"]["v_revenue_by_month"]["Row"]>;
 export type TopCustomer     = NonNullableFields<Database["public"]["Views"]["v_top_customers"]["Row"]>;
 export type ProductPerf     = NonNullableFields<Database["public"]["Views"]["v_product_performance"]["Row"]>;
@@ -715,38 +749,45 @@ export type SalesByRep      = NonNullableFields<Database["public"]["Views"]["v_s
 
 // ─── Common utility types (merged from common.ts) ──────────────────────────
 
-// Server Action return type — consistent shape for all mutations
+/**
+ * ActionResult is a TypeScript Generic interface (`<T>`). It enforces a consistent return
+ * format for all our Server Actions (mutations), making frontend response handling standardized.
+ *
+ * If success is true: it returns the database record of type `T` (e.g. Company).
+ * If success is false: it returns an error message and optional field-level validation errors.
+ */
 export type ActionResult<T = void> =
   | { success: true; data: T; message?: string }
   | { success: false; error: string; fieldErrors?: Record<string, string[]> };
 
-// Pagination
+// Standard pagination parameters requested by tables
 export interface PaginationParams {
   page: number;
   pageSize: number;
 }
 
+// Standard paginated wrapper return shape containing row subset metadata
 export interface PaginatedResult<T> {
-  data: T[];
-  total: number;
+  data: T[]; // The subset array of records for the active page
+  total: number; // The total matching records in the entire database table
   page: number;
   pageSize: number;
-  totalPages: number;
+  totalPages: number; // Computed count of total pages: ceil(total / pageSize)
 }
 
-// Filter/sort
+// Configuration for active column sorting
 export interface SortConfig {
   column: string;
   direction: "asc" | "desc";
 }
 
-// Generic select option (used in dropdowns)
+// Standard utility for rendering options in select elements
 export interface SelectOption {
   value: string;
   label: string;
 }
 
-// Date range filter
+// Date boundaries for dashboard search filters
 export interface DateRange {
   from: Date;
   to: Date;

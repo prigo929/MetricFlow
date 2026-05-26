@@ -9,26 +9,44 @@ import type { UserProfile } from "@/types";
 
 export const metadata: Metadata = { title: "Settings" };
 
+/**
+ * SETTINGS PAGE (Server Component)
+ * This page displays user profile information and, if the logged-in user is an administrator,
+ * fetches and displays user management tools and the system transaction audit log.
+ */
 export default async function SettingsPage() {
   const supabase = await createClient();
+  
+  // 1. Fetch the authenticated user's ID
   const { data: { user } } = await supabase.auth.getUser();
+  
+  // 2. Fetch the corresponding profile information containing display name and role settings
   const { data } = await (supabase as any)
     .from("user_profiles").select("*").eq("id", user!.id).single();
   const profile = data as UserProfile | null;
 
+  // Generate a two-letter uppercase abbreviation of the name for avatar display
   const initials = profile?.full_name
     ?.split(" ").map((n: string) => n[0]).join("").toUpperCase().slice(0, 2) ?? "U";
 
   let profiles: UserProfile[] = [];
   let logs: any[] = [];
-  let migrationNeeded = false;
+  let migrationNeeded = false; // Flag to identify if database audit tables aren't deployed
 
+  // ROLE-BASED ACCESS CONTROL (RBAC):
+  // We perform database queries and show audit options ONLY if the user's role is strictly "admin".
+  // Because this is done on the server-side, a standard "sales_rep" user has no way to invoke
+  // or see these database operations or leak data.
   if (profile?.role === "admin") {
     try {
+      // Query all user profiles ordered alphabetically by name
       const pRes = await (supabase as any).from("user_profiles").select("*").order("full_name");
+      
+      // Query recent audit logs, performing a SQL JOIN to pull the name of the user who made the change
       const lRes = await (supabase as any).from("audit_logs").select("*, changed_by_user:user_profiles(full_name)").order("changed_at", { ascending: false }).limit(50);
       
       if (pRes.error || lRes.error) {
+        // If query fails (e.g. audit_logs table does not exist yet), toggle warning state
         migrationNeeded = true;
       } else {
         profiles = pRes.data || [];
@@ -60,9 +78,11 @@ export default async function SettingsPage() {
           </CardContent>
         </Card>
 
+        {/* ADMIN CONTROLS SECTION: Rendered only for administrators */}
         {profile?.role === "admin" && (
           <div className="md:col-span-2 space-y-6">
             {migrationNeeded ? (
+              /* If audit tables are missing, render instructions instead of crashing the application */
               <Card className="border-amber-200 bg-amber-50/50 shadow-sm">
                 <CardHeader>
                   <CardTitle className="text-amber-800 flex items-center gap-2">
@@ -100,6 +120,7 @@ export default async function SettingsPage() {
                             <p className="text-sm font-semibold text-gray-900">{p.full_name}</p>
                             <p className="text-xs text-gray-400">{p.email}</p>
                           </div>
+                          {/* Role Selector component (Client Component) to update role privilege dynamically */}
                           <RoleSelector userId={p.id} currentRole={p.role} />
                         </div>
                       ))}
@@ -130,3 +151,4 @@ export default async function SettingsPage() {
     </div>
   );
 }
+

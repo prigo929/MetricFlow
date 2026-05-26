@@ -9,6 +9,15 @@ import { DollarSign, ShoppingCart, Users, TrendingUp, ShieldAlert } from "lucide
 import Link from "next/link";
 import dynamic from "next/dynamic";
 
+/**
+ * WHAT IS Next.js dynamic()?
+ * Charting libraries (like Recharts used in RevenueChart) rely on browser APIs like `window`, SVG rendering, and `document`.
+ * Since Next.js components render on the Node.js server first (where there is no browser environment), 
+ * importing charts normally would throw "window is not defined" errors.
+ * 
+ * We use `dynamic()` with `{ ssr: false }` to tell Next.js: "Skip rendering this component on the server.
+ * Load and render it only when the page reaches the user's browser (client-side)."
+ */
 const RevenueChart = dynamic(
   () => import("@/components/charts/RevenueChart").then((mod) => mod.RevenueChart),
   {
@@ -35,6 +44,12 @@ const TopCustomersTable = dynamic(
 
 export const metadata: Metadata = { title: "Dashboard" };
 
+/**
+ * REACT SERVER COMPONENT (RSC):
+ * By default in Next.js App Router, components are Server Components. They are declared `async` and
+ * execute strictly on the Node.js server. This allows us to query our database directly (via Supabase Server client)
+ * before rendering the page, completely bypassing client-side fetching APIs like `useEffect` or `fetch()`.
+ */
 export default async function DashboardPage({
   searchParams,
 }: {
@@ -58,6 +73,12 @@ export default async function DashboardPage({
     rangeAllOrdersQuery = rangeAllOrdersQuery.gte("order_date", startDate);
   }
 
+  /**
+   * WHAT IS Promise.all?
+   * Instead of using `await` on every query sequentially (which creates a slow waterfall request chain),
+   * we wrap them in `Promise.all`. This tells Node.js to fire all six database queries CONCURRENTLY in parallel,
+   * significantly boosting page loading performance.
+   */
   const [
     { data: thisMonthOrders },
     { data: lastMonthOrders },
@@ -74,7 +95,7 @@ export default async function DashboardPage({
     (supabase as any).from("products").select("id, name, stock_qty").eq("is_active", true).lt("stock_qty", 10),
   ]);
 
-  // Fetch Sales Intelligence alerts safely (degrades gracefully if migration 003 isn't run yet)
+  // Fetch Sales Intelligence alerts safely (degrades gracefully if view migrations aren't run yet)
   let churnAlerts: any[] = [];
   let velocityAlerts: any[] = [];
 
@@ -283,3 +304,4 @@ export default async function DashboardPage({
     </div>
   );
 }
+

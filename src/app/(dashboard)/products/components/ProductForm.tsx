@@ -30,6 +30,7 @@ export function ProductForm({ product }: { product?: Product }) {
     formState: { errors, isSubmitting },
   } = useForm<ProductFormValues>({
     resolver: zodResolver(productSchema) as any,
+    // Prefill form if product exists (EDIT mode), otherwise set default values (active, 0 stock)
     defaultValues: product
       ? {
           name:        product.name,
@@ -45,9 +46,12 @@ export function ProductForm({ product }: { product?: Product }) {
 
   const onSubmit: SubmitHandler<ProductFormValues> = async (values) => {
     setServerError(null);
+    
+    // Choose create or update action based on product existence
     const result = product
       ? await updateProduct(product.id, values)
       : await createProduct(values);
+      
     if (!result.success) {
       setServerError(result.error);
       toast({
@@ -89,6 +93,7 @@ export function ProductForm({ product }: { product?: Product }) {
                 placeholder="Optional product description…" />
             </div>
             <div className="col-span-2 flex items-center gap-2">
+              {/* Checkboxes map naturally to Boolean states in Zod */}
               <input type="checkbox" id="is_active" {...register("is_active")}
                 className="w-4 h-4 accent-brand-500 rounded" />
               <label htmlFor="is_active" className="text-sm font-medium text-gray-700">Active (visible in orders)</label>
@@ -110,3 +115,4 @@ export function ProductForm({ product }: { product?: Product }) {
     </Card>
   );
 }
+

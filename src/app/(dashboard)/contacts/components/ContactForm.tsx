@@ -16,7 +16,7 @@ import type { Contact, Company } from "@/types";
 interface Props {
   contact?: Contact;
   companies: Pick<Company, "id" | "name">[];
-  defaultCompanyId?: string;
+  defaultCompanyId?: string; // If creating a contact from inside a specific company detail view
 }
 
 export function ContactForm({ contact, companies, defaultCompanyId }: Props) {
@@ -25,6 +25,7 @@ export function ContactForm({ contact, companies, defaultCompanyId }: Props) {
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<ContactFormValues>({
     resolver: zodResolver(contactSchema) as any,
+    // Prefill form if editing, or default to the company we clicked "Add Contact" from
     defaultValues: contact
       ? { company_id: contact.company_id, full_name: contact.full_name, email: contact.email, phone: contact.phone ?? undefined, job_title: contact.job_title ?? undefined, is_primary: contact.is_primary }
       : { company_id: defaultCompanyId ?? "", is_primary: false },
@@ -51,6 +52,8 @@ export function ContactForm({ contact, companies, defaultCompanyId }: Props) {
       variant: "success",
     });
 
+    // Instead of forcing redirection to /contacts, send user back to where they came from
+    // (e.g. company detail dashboard page) to keep B2B navigation natural.
     router.back();
     router.refresh();
   };
@@ -84,3 +87,4 @@ export function ContactForm({ contact, companies, defaultCompanyId }: Props) {
     </Card>
   );
 }
+

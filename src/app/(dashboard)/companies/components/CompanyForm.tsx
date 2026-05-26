@@ -31,19 +31,25 @@ const TIER_OPTIONS = [
   { value: "smb",        label: "SMB" },
 ];
 
-interface CompanyFormProps { company?: Company }
+interface CompanyFormProps { 
+  // If `company` is passed, the form acts in EDIT mode. Otherwise, it acts in CREATE mode.
+  company?: Company 
+}
 
 export function CompanyForm({ company }: CompanyFormProps) {
   const router = useRouter();
+  // State to capture and display database-level mutation errors returned by the server
   const [serverError, setServerError] = useState<string | null>(null);
 
   const {
     register,
     handleSubmit,
+    // `isSubmitting` is handled automatically by react-hook-form during async onSubmit execution
     formState: { errors, isSubmitting },
   } = useForm<CompanyFormData>({
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     resolver: zodResolver(companySchema) as any,
+    // If we have an existing company (EDIT mode), prefill form values.
+    // Otherwise (CREATE mode), initialize defaults (e.g. SMB tier in Romania).
     defaultValues: company
       ? {
           name:           company.name,
@@ -61,10 +67,13 @@ export function CompanyForm({ company }: CompanyFormProps) {
 
   const onSubmit: SubmitHandler<CompanyFormData> = async (values) => {
     setServerError(null);
+    
+    // Choose which Server Action to invoke based on whether we are editing or creating
     const result = company
       ? await updateCompany(company.id, values)
       : await createCompany(values);
 
+    // If server action fails, notify user and render message
     if (!result.success) {
       setServerError(result.error);
       toast({
@@ -75,6 +84,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
       return;
     }
 
+    // If successful, render notification toaster card
     toast({
       title: company ? "Company updated" : "Company created",
       description: company
@@ -83,6 +93,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
       variant: "success",
     });
 
+    // Send user back to companies grid list and tell Next.js to refresh layout state
     router.push("/companies");
     router.refresh();
   };
@@ -141,3 +152,4 @@ export function CompanyForm({ company }: CompanyFormProps) {
     </Card>
   );
 }
+
