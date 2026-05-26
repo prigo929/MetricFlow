@@ -11,11 +11,19 @@ interface PaginationProps {
   totalItems: number;
 }
 
+/**
+ * REUSABLE PAGINATION CONTROL BAR:
+ * Renders next/prev page buttons, individual page links, and a rows-per-page limit dropdown.
+ * 
+ * Like our filters, this control keeps pagination state in the URL (`?page=2&limit=10`) 
+ * so that table slicing can be executed efficiently on the server side via database range queries.
+ */
 export function Pagination({ currentPage, totalPages, pageSize, totalItems }: PaginationProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  // Updates the "page" query in the URL when a user clicks a page link
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
     const params = new URLSearchParams(searchParams.toString());
@@ -23,17 +31,24 @@ export function Pagination({ currentPage, totalPages, pageSize, totalItems }: Pa
     router.push(`${pathname}?${params.toString()}`);
   };
 
+  // Triggered when the user changes rows-per-page (e.g. from 10 to 50 rows)
   const handleLimitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const value = e.target.value;
     const params = new URLSearchParams(searchParams.toString());
     params.set("limit", value);
-    params.set("page", "1"); // Reset to page 1 on limit change
+    params.set("page", "1"); // RESET TO PAGE 1: changing limit changes total page divisions.
     router.push(`${pathname}?${params.toString()}`);
   };
 
+  // If there is only 1 page of data, hide the pagination bar entirely
   if (totalPages <= 1) return null;
 
-  // Generate pagination page numbers to show
+  /**
+   * SLIDING WINDOW PAGE CALCULATOR:
+   * If a dataset has 100 pages, we don't want to render 100 buttons on the screen.
+   * This helper computes a subset array of up to 5 visible page numbers centered around `currentPage`.
+   * For example, if currentPage is 5, it returns `[3, 4, 5, 6, 7]`.
+   */
   const getPageNumbers = () => {
     const pages: number[] = [];
     const maxVisible = 5;
@@ -50,6 +65,9 @@ export function Pagination({ currentPage, totalPages, pageSize, totalItems }: Pa
     return pages;
   };
 
+  // INDEX MATHEMATICS:
+  // Calculate the first and last item index currently displayed on screen.
+  // Example: Page 2 with size 10 starts at item index 11.
   const startItem = (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(totalItems, currentPage * pageSize);
 
@@ -114,3 +132,4 @@ export function Pagination({ currentPage, totalPages, pageSize, totalItems }: Pa
     </div>
   );
 }
+
