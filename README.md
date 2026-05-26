@@ -286,22 +286,74 @@ Instead of running calculations in JavaScript, MetricFlow handles analytics dire
     *   *Monetary (M)*: Total budget spent with the organization.
 *   **How it works**: The PostgreSQL view aggregates order histories (excluding drafts/cancelled orders). It leverages the `NTILE(4)` window function to distribute clients into four quartiles for each metric:
     ```sql
-    ntile(4) over (order by recency desc) as r_score,   -- 4 is most recent, 1 is oldest
-    ntile(4) over (order by frequency asc) as f_score,  -- 4 is most frequent, 1 is least
-    ntile(4) over (order by monetary asc) as m_score    -- 4 is highest spend, 1 is lowest
+    create or replace view public.v_rfm_segments as
+    with raw_metrics as (
+      select
+        c.id as company_id,
+        c.name as company_name,
+        c.tier,
+        (current_date - max(o.order_date))::integer as recency,
+        count(o.id)::integer as frequency,
+        coalesce(sum(o.total_amount), 0) as monetary
+      from public.companies c
+      join public.orders o on o.company_id = c.id
+      where o.status not in ('draft', 'cancelled')
+      group by c.id, c.name, c.tier
+    ),
+    scores as (
+      select
+        *,
+        ntile(4) over (order by recency desc) as r_score, -- Older last dates get 1, more recent gets 4
+        ntile(4) over (order by frequency asc) as f_score, -- Fewer orders gets 1, more orders gets 4
+        ntile(4) over (order by monetary asc) as m_score   -- Smaller spend gets 1, larger spend gets 4
+      from raw_metrics
+    )
+    select
+      *,
+      (r_score || '-' || f_score || '-' || m_score) as rfm_code,
+      case
+        when r_score >= 3 and f_score >= 3 and m_score >= 3 then 'Champions'
+        when r_score >= 3 and f_score >= 1 and m_score >= 3 then 'Loyal Customers'
+        when r_score >= 3 and f_score >= 3 and m_score >= 1 then 'Promising'
+        when r_score >= 3 and f_score >= 1 and m_score >= 1 then 'New Customers'
+        when r_score <= 2 and f_score >= 3 and m_score >= 3 then 'Can''t Lose Them'
+        when r_score <= 2 and f_score >= 2 and m_score >= 2 then 'At Risk'
+        when r_score <= 2 and f_score <= 2 and m_score >= 2 then 'About to Sleep'
+        else 'Lost / Hibernating'
+      end as rfm_segment
+    from scores;
     ```
-    The scores are concatenated into an RFM code (e.g. `4-4-4` or `1-2-1`) and mapped to behavioral segments:
-    *   *Champions* (R $\ge$ 3, F $\ge$ 3, M $\ge$ 3)
-    *   *Loyal Customers* (R $\ge$ 3, F $\ge$ 1, M $\ge$ 3)
-    *   *At Risk* (R $\le$ 2, F $\ge$ 2, M $\ge$ 2)
-    *   *Lost / Hibernating* (R $\le$ 2, F $\le$ 2)
 *   **UI Presentation**: Visualized in Recharts via `RfmSegmentChart` (a responsive horizontal bar chart) and a detailed filterable data matrix (`RfmDetailsTable`) located under the route directory components.
 
 #### B. Automated Churn Risk Detection (`v_churn_risk`)
 *   **The Theory**: Customer churn is a lagging indicator. To address it preemptively, MetricFlow monitors each client's purchasing cadence (average days between orders) and flags sudden drops in activity.
 *   **How it works**: The view calculates the mathematical average of order intervals per company. If the current days elapsed since their last order exceeds their historical average interval by **1.5x**, the client is flagged (`is_at_risk = true`):
     ```sql
-    (oi.days_since_last_order > (coalesce(oi.avg_days_between, 45) * 1.5)) as is_at_risk
+    create or replace view public.v_churn_risk as
+    with order_intervals as (
+      select
+        company_id,
+        (current_date - max(order_date))::integer as days_since_last_order,
+        case
+          when count(id) > 1 then
+            (max(order_date) - min(order_date))::integer / (count(id) - 1)
+          else
+            null
+        end as avg_days_between
+      from public.orders
+      where status not in ('draft', 'cancelled')
+      group by company_id
+    )
+    select
+      c.id as company_id,
+      c.name as company_name,
+      c.tier,
+      oi.days_since_last_order,
+      coalesce(oi.avg_days_between, 45) as avg_days_between,
+      (oi.days_since_last_order > (coalesce(oi.avg_days_between, 45) * 1.5)) as is_at_risk,
+      round(oi.days_since_last_order::numeric / coalesce(oi.avg_days_between, 45)::numeric, 2) as risk_factor
+    from public.companies c
+    join order_intervals oi on oi.company_id = c.id;
     ```
 *   **UI Presentation**: Surfaces critical alerts in an executive alert feed on the main Dashboard, enabling sales reps to intervene before the customer churns.
 
@@ -309,8 +361,34 @@ Instead of running calculations in JavaScript, MetricFlow handles analytics dire
 *   **The Theory**: Supply chain delays lead to lost revenue. Stockout forecasting models inventory depletion based on current sales velocity.
 *   **How it works**: The view calculates the product velocity (units sold per day over the last 30 days) and divides the current stock level by this velocity to forecast days remaining before depletion:
     ```sql
-    round(coalesce(s.total_units_sold, 0)::numeric / 30.0, 2) as avg_daily_velocity,
-    least(round(p.stock_qty::numeric / (coalesce(s.total_units_sold, 0)::numeric / 30.0), 0), 999) as days_to_stockout
+    create or replace view public.v_product_velocity as
+    with sales_last_30_days as (
+      select
+        product_id,
+        coalesce(sum(quantity), 0) as total_units_sold
+      from public.order_items oi
+      join public.orders o on o.id = oi.order_id
+      where o.status not in ('draft', 'cancelled')
+        and o.order_date >= (current_date - interval '30 days')
+      group by product_id
+    )
+    select
+      p.id as product_id,
+      p.name as product_name,
+      p.sku,
+      p.category,
+      p.stock_qty,
+      coalesce(s.total_units_sold, 0)::integer as units_sold_30d,
+      round(coalesce(s.total_units_sold, 0)::numeric / 30.0, 2) as avg_daily_velocity,
+      case
+        when coalesce(s.total_units_sold, 0) > 0 then
+          least(round(p.stock_qty::numeric / (coalesce(s.total_units_sold, 0)::numeric / 30.0), 0), 999)
+        else
+          999
+      end as days_to_stockout
+    from public.products p
+    left join sales_last_30_days s on s.product_id = p.id
+    where p.is_active = true;
     ```
 *   **UI Presentation**: Highlights critical products on the dashboard and product catalog with countdown badges and replenishment warnings.
 
@@ -385,6 +463,34 @@ Next.js Server Components inside MetricFlow render pages directly on the server 
 To enforce route isolation and make the codebase highly maintainable:
 *   **Route-Specific Components**: Components that are only consumed by a single route folder are co-located in a `./components/` subdirectory directly inside that route. For example, `src/app/(dashboard)/analytics/components/` hosts view-specific RFM segmentation tables and graphs, and `src/app/(dashboard)/dashboard/components/` hosts top customer metrics.
 *   **Shared Primitives**: Only components that are consumed by multiple different routes (e.g., `RevenueChart.tsx` inside charts, or `Pagination.tsx` and `ExportButton.tsx` inside shared) are kept in the global components folder.
+
+### 5. Next.js Server & Application Architecture
+
+For academic evaluation, the software layers in the MetricFlow application are structured around Next.js modern paradigms:
+
+#### A. OAuth Session Callbacks & Code Exchanges (`src/app/auth/callback/route.ts`)
+When users authenticate, Supabase redirects them back to the Next.js router with a query code (`?code=...`). We process this on the server edge to log in securely:
+*   **The Route Handler**: Instantiates a cookies-aware Supabase server client and calls `supabase.auth.exchangeCodeForSession(code)`.
+*   **Safety Redirects**: If session validation succeeds, it redirects flows back to `/dashboard` (or the specified target dynamic next parameter) without exposing secrets to client states. If it fails, it issues a redirect to the login form with query flags.
+
+#### B. Unified Server Actions Mutation Layer (`src/actions/index.ts`)
+Next.js Server Actions execute securely as RPC endpoints. They run entirely on the server and are declared using the `"use server"` directive at the top of the file:
+*   **Form Mutations**: Instead of exposing raw API endpoints, our actions like `createOrder` receive validated form payloads, execute server queries inside transaction wrappers, and output standardized `ActionResult` payloads back to client states.
+*   **Type Safety**: Actions are typed with typescript, ensuring complete input validation matching database row structures.
+*   **Dynamic Revalidations**: Triggers path revalidation (`revalidatePath`) to clear cached layout states, forcing pages to reload fresh rows without full page refreshes.
+
+#### C. Separation of Supabase Clients (`src/lib/supabase/`)
+Next.js Server Components require server-level clients, whereas interactive Client Components require browser clients:
+*   **Browser Client (`client.ts`)**: Uses `createBrowserClient` to issue queries using public project keys, utilizing local browser cookie access.
+*   **Server Client (`server.ts`)**: Uses `createServerClient` wrapping Next.js request/response cookie headers. This ensures auth tokens (JWTs) are sent with every server-rendered page check, maintaining session integrity.
+
+#### D. Zod Form Schema Validation (`src/lib/validations/`)
+All frontend input checks are declared centrally using Zod schema structures in `src/lib/validations/schemas.ts`:
+*   **Coerced Casts**: Casts HTML string inputs (like number inputs) into numbers (`z.coerce.number()`) and pre-processes blank entries into SQL-friendly `null` values.
+*   **Pre-mutations Validation**: Forms match schemas on submission, blocking network queries if data integrity fails.
+
+#### E. State Management Toaster reducer (`src/hooks/use-toast.ts`)
+Renders sliding Radix UI notifications. Features an optimized React state reducer queueing, firing, and automatically garbage-collecting Toast objects after timeouts, ensuring browser performance is preserved.
 
 ---
 
