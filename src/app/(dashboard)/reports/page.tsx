@@ -12,14 +12,30 @@ export const metadata: Metadata = { title: "Reports" };
 
 type OrderRow = Order & { company: Pick<Company, "name" | "tier"> | null };
 
+/**
+ * React Server Component generating downloadable financial report summaries.
+ * 
+ * Fetches all finalized, non-draft orders, aggregates total revenue and averages in memory,
+ * and outputs a pageless report table.
+ */
 export default async function ReportsPage() {
+  // Initialize server cookies Supabase client
   const supabase = await createClient();
+  
+  // Fetch all orders except draft or cancelled orders.
+  // Performs a left join to fetch the matching company's name and tier for report formatting.
   const { data } = await (supabase as any)
     .from("orders")
     .select("*, company:companies(name, tier)")
     .not("status", "in", '("draft","cancelled")')
     .order("order_date", { ascending: false });
+    
   const orders = (data ?? []) as OrderRow[];
+  
+  // Concept: In-Memory Accumulator
+  // Using Array.prototype.reduce() to sum up the `total_amount` of all fetched orders.
+  // The function takes a callback (with the accumulator `s` and current order `o`) 
+  // and starts with an initial value of 0.
   const totalRevenue = orders.reduce((s, o) => s + o.total_amount, 0);
 
   return (

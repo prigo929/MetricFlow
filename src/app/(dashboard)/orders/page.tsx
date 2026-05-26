@@ -17,6 +17,12 @@ export const metadata: Metadata = { title: "Orders" };
 
 type OrderRow = Order & { company: Pick<Company, "name"> | null; assigned_user: Pick<UserProfile, "full_name"> | null };
 
+/**
+ * React Server Component displaying all sales orders.
+ * 
+ * Includes advanced server-side search spanning multiple related database tables,
+ * paginating rows, ordering by columns, and filtering by order status.
+ */
 export default async function OrdersPage({
   searchParams,
 }: {
@@ -24,6 +30,7 @@ export default async function OrdersPage({
 }) {
   const supabase = await createClient();
   
+  // Parse incoming URL query strings, providing default values for page pagination
   const q = searchParams.q || "";
   const status = searchParams.status || "";
   const page = parseInt(searchParams.page || "1", 10);
@@ -33,10 +40,18 @@ export default async function OrdersPage({
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
+  // Concept: Cross-Table Relational Filtering in PostgREST
+  // Supabase's API (PostgREST) is stateless and doesn't allow easy filtering of parent tables 
+  // directly within the select query (e.g. searching orders by company name).
+  //
+  // Workaround Strategy:
+  // 1. If there is a search term `q`, we fetch matching Company IDs and Sales Rep User IDs first.
+  // 2. We use those IDs in the main query using an SQL `in(...)` clause combined inside an `or` block.
   let companyIds: string[] = [];
   let userIds: string[] = [];
 
   if (q) {
+    // Look up company IDs where name contains the search string
     const { data: companies } = await (supabase as any)
       .from("companies")
       .select("id")
@@ -45,6 +60,7 @@ export default async function OrdersPage({
       companyIds = companies.map((c: any) => c.id);
     }
 
+    // Look up Sales Rep IDs where name contains the search string
     const { data: users } = await (supabase as any)
       .from("user_profiles")
       .select("id")
@@ -55,30 +71,43 @@ export default async function OrdersPage({
   }
 
   // Build paginated query
+  // Syntax "company:companies(name)" renames the nested relational field from "companies" to "company"
+  // and selects only the "name" column, performing a left-join on companies.company_id = orders.company_id.
   let listQuery = (supabase as any)
     .from("orders")
     .select("*, company:companies(name), assigned_user:user_profiles(full_name)", { count: "exact" });
 
+  // Filter orders by status if selected
   if (status) {
     listQuery = listQuery.eq("status", status);
   }
 
+  // Construct dynamic OR conditions for the search query
   if (q) {
+    // Always match on order number
     const conditions = [`order_number.ilike.%${q}%`];
+    
+    // Match order if it belongs to any companies found in the sub-lookup
     if (companyIds.length > 0) {
       conditions.push(`company_id.in.(${companyIds.join(",")})`);
     }
+    
+    // Match order if it belongs to any sales reps found in the sub-lookup
     if (userIds.length > 0) {
       conditions.push(`assigned_to.in.(${userIds.join(",")})`);
     }
+    
+    // Join the conditions with comma to perform an SQL OR condition
     listQuery = listQuery.or(conditions.join(","));
   }
 
+  // Fetch only the paginated slice of records
   const { data: listData, count } = await listQuery
     .order(sort, { ascending: order === "asc" })
     .range(from, to);
 
-  // Build export query (without limit/range)
+  // Build a parallel export query (ignoring limits/range offset)
+  // Ensures the exported CSV spreadsheet contains all filtered records, not just the active page.
   let exportQuery = (supabase as any)
     .from("orders")
     .select("*, company:companies(name), assigned_user:user_profiles(full_name)");

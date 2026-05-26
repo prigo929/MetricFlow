@@ -13,10 +13,17 @@ import {
 import dynamic from "next/dynamic";
 import Link from "next/link";
 
+// Concept: Code Splitting & SSR Disabling for Browser-Only Libraries
+// Recharts and standard charting packages access the `window` and `document` DOM APIs.
+// Because React Server Components execute on the server, loading these packages during SSR
+// results in "window is not defined" reference errors.
+// By using `next/dynamic` with `{ ssr: false }`, we tell Next.js to skip pre-rendering these
+// components on the server, lazy-loading them on the browser instead.
 const RevenueChart = dynamic(
   () => import("@/components/charts/RevenueChart").then((mod) => mod.RevenueChart),
   {
     ssr: false,
+    // Pre-rendering placeholder displayed while the component JS is loading asynchronously
     loading: () => <div className="h-[220px] bg-gray-50 animate-pulse rounded-xl flex items-center justify-center text-xs text-gray-400">Loading chart...</div>,
   }
 );
@@ -53,10 +60,12 @@ export default async function AnalyticsPage({
   searchParams: { range?: string; tab?: string };
 }) {
   const supabase = await createClient();
+  
+  // Extract query filters, defaulting to a 12-Month lookback range
   const range = searchParams.range || "12M";
   const startDate = getStartDate(range);
 
-  // Fetch orders and items dynamically for range
+  // Fetch orders with nested details, filtering out drafts or cancelled orders
   let query = (supabase as any)
     .from("orders")
     .select(`
@@ -67,6 +76,7 @@ export default async function AnalyticsPage({
     `)
     .not("status", "in", '("draft","cancelled")');
 
+  // Limit date range if applicable
   if (startDate) {
     query = query.gte("order_date", startDate);
   }
@@ -74,14 +84,18 @@ export default async function AnalyticsPage({
   const { data } = await query.order("order_date", { ascending: true });
   const rangeOrders = (data ?? []) as any[];
 
-  // Aggregate stats using in-memory triggers
+  // Perform analytical mathematical aggregations in JS memory
   const revenueTrend = aggregateRevenueTrend(rangeOrders, range);
   const productPerf = aggregateProductPerformance(rangeOrders);
   const salesRepPerf = aggregateSalesRepPerformance(rangeOrders);
 
   const activeTab = searchParams.tab || "sales";
 
-  // Fetch RFM Segments safely (degrades gracefully if migration 003 isn't run yet)
+  // Concept: Graceful Feature Degradation
+  // RFM customer scoring relies on a database SQL view (`v_rfm_segments`).
+  // If the user hasn't run the migration schema file, querying this table will throw an SQL error.
+  // We wrap the fetch in a try/catch block so that if the query fails, we print a warning
+  // to the server terminal, but the rest of the analytics page still loads successfully.
   let rfmData: any[] = [];
   try {
     const { data: rawRfm, error: rfmErr } = await (supabase as any)
@@ -94,7 +108,7 @@ export default async function AnalyticsPage({
     console.warn("v_rfm_segments query failed");
   }
 
-  // Aggregate RFM segment counts
+  // Pre-define all valid RFM segment buckets to ensure we always show empty states too
   const segmentCounts: Record<string, number> = {
     "Champions": 0,
     "Loyal Customers": 0,
@@ -106,12 +120,15 @@ export default async function AnalyticsPage({
     "Lost / Hibernating": 0,
   };
 
+  // Populate segment buckets dynamically based on users returned
   rfmData.forEach((item) => {
     if (segmentCounts[item.rfm_segment] !== undefined) {
       segmentCounts[item.rfm_segment]++;
     }
   });
 
+  // Transform the counts dictionary object into a format suitable for charting packages:
+  // e.g. [{ segment: "Champions", count: 5 }, { segment: "At Risk", count: 2 }]
   const rfmChartData = Object.entries(segmentCounts).map(([segment, count]) => ({
     segment,
     count,

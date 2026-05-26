@@ -11,11 +11,25 @@ import type { Product } from "@/types";
 
 export const metadata: Metadata = { title: "Products" };
 
+/**
+ * React Server Component displaying all product catalog entries.
+ * 
+ * Fetches products sorted alphabetically, triggers an in-memory low stock evaluation,
+ * and renders products using a responsive responsive layout grid.
+ */
 export default async function ProductsPage() {
+  // Initialize server cookies Supabase client
   const supabase = await createClient();
+  
+  // Fetch all products ordered alphabetically by name
   const { data } = await (supabase as any).from("products").select("*").order("name");
   const products = (data ?? []) as Product[];
 
+  // Concept: In-Memory Array Filtering
+  // Rather than making a separate database query to check for low stock,
+  // we filter the already loaded products array in memory to find products that are:
+  // 1. Active (`is_active === true`)
+  // 2. Low in stock (`stock_qty < 10`)
   const lowStockProducts = products.filter((p) => p.is_active && p.stock_qty < 10);
 
   return (

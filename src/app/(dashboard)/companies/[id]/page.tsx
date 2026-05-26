@@ -13,20 +13,44 @@ import type { Company, Contact, Order } from "@/types";
 
 export const metadata: Metadata = { title: "Company Detail" };
 
+/**
+ * Company Detail Page (Dynamic Router Segment)
+ * 
+ * Concept: Dynamic Routes
+ * The folder `[id]` defines a dynamic route segment. Next.js extracts whatever value is in
+ * the URL (e.g. `/companies/abc-123`) and passes it in the `params` prop as `{ id: "abc-123" }`.
+ */
 export default async function CompanyDetailPage({ params }: { params: { id: string } }) {
+  // Initialize server cookies Supabase client
   const supabase = await createClient();
 
+  // Performance Pattern: Concurrent Server Fetches
+  // Instead of waiting for companies query, then waiting for contacts query, then waiting for orders query
+  // sequentially (causing a "waterfall" latency block), we use Promise.all to dispatch all three
+  // queries to Postgres simultaneously.
   const [{ data: co }, { data: contacts }, { data: orders }] = await Promise.all([
+    // Get the specific company details
     (supabase as any).from("companies").select("*").eq("id", params.id).single(),
+    // Fetch all contacts linked to this company sorted alphabetically by name
     (supabase as any).from("contacts").select("*").eq("company_id", params.id).order("full_name"),
+    // Fetch the 10 most recent orders for this company
     (supabase as any).from("orders").select("*").eq("company_id", params.id).order("order_date", { ascending: false }).limit(10),
   ]);
 
+  // If no company record matches the ID, render the default Next.js 404 page
   if (!co) notFound();
+  
+  // Cast raw database items into structured TypeScript types
   const company    = co       as Company;
   const contactList = (contacts ?? []) as Contact[];
   const orderList   = (orders  ?? []) as Order[];
-  const totalRevenue = orderList.filter(o => !["draft","cancelled"].includes(o.status)).reduce((s, o) => s + o.total_amount, 0);
+  
+  // Aggregate revenue in memory for this company:
+  // 1. Filter out unpaid/non-finalized orders (e.g., drafts and cancellations).
+  // 2. Sum the remaining totals using reduce() starting with a base accumulator value of 0.
+  const totalRevenue = orderList
+    .filter(o => !["draft", "cancelled"].includes(o.status))
+    .reduce((s, o) => s + o.total_amount, 0);
 
   return (
     <div className="max-w-5xl">

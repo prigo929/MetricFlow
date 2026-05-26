@@ -15,35 +15,67 @@ import type { Company } from "@/types";
 
 export const metadata: Metadata = { title: "Companies" };
 
+/**
+ * Next.js App Router Page Component for Companies list.
+ * 
+ * Concept: React Server Components (RSC)
+ * This page is marked as an async function and runs entirely on the server.
+ * Instead of fetching data in a useEffect hook on the browser, it retrieves data 
+ * directly from Supabase on the server side and renders static/dynamic HTML.
+ * 
+ * @param searchParams Next.js passes URL query parameter key-values as a prop to server pages.
+ * e.g., `/companies?q=acme&page=2` becomes `{ q: "acme", page: "2" }`.
+ */
 export default async function CompaniesPage({
   searchParams,
 }: {
   searchParams: { q?: string; tier?: string; page?: string; limit?: string; sort?: string; order?: string };
 }) {
+  // Create an authenticated Supabase client using server cookies context
   const supabase = await createClient();
   
+  // Extract and normalize query parameters, fallback to defaults if not provided.
   const q = searchParams.q || "";
   const tier = searchParams.tier || "";
+  
+  // Parse numeric pagination parameters. Always specify base 10 radix for parseInt safety.
   const page = parseInt(searchParams.page || "1", 10);
   const limit = parseInt(searchParams.limit || "10", 10);
+  
+  // Extract sorting column & order direction
   const sort = searchParams.sort || "created_at";
   const order = searchParams.order || "desc";
+  
+  // Pagination Math (0-indexed for SQL offsets):
+  // range(from, to) in Supabase is inclusive.
+  // For page 1, limit 10: from = 0, to = 9 (retrieves first 10 items)
+  // For page 2, limit 10: from = 10, to = 19 (retrieves next 10 items)
   const from = (page - 1) * limit;
   const to = from + limit - 1;
 
-  // Build paginated query
+  // 1. Build the paginated list query
+  // { count: "exact" } requests the total row count matching our filters, ignoring limits/range.
+  // This lets us calculate total pages for pagination UI.
   let listQuery = (supabase as any).from("companies").select("*", { count: "exact" });
+  
+  // Case-insensitive search filter using ILIKE
   if (q) {
     listQuery = listQuery.ilike("name", `%${q}%`);
   }
+  
+  // Exact value matching filter (e.g. tier = 'enterprise')
   if (tier) {
     listQuery = listQuery.eq("tier", tier);
   }
+  
+  // Execute paginated database query with order & range
   const { data: listData, count } = await listQuery
     .order(sort, { ascending: order === "asc" })
     .range(from, to);
 
-  // Build export query (without limit/range)
+  // 2. Build the export query (Without limit or pagination range)
+  // Why? When a user clicks "Export CSV", they want all matching results,
+  // not just the current page's subset (e.g., they want all 100 matching rows, not just 10).
   let exportQuery = (supabase as any).from("companies").select("*");
   if (q) {
     exportQuery = exportQuery.ilike("name", `%${q}%`);
@@ -53,9 +85,12 @@ export default async function CompaniesPage({
   }
   const { data: exportData } = await exportQuery.order(sort, { ascending: order === "asc" });
 
+  // Fallback values if database returns null/undefined
   const companies = (listData ?? []) as Company[];
   const exportCompanies = (exportData ?? []) as Company[];
   const totalItems = count ?? 0;
+  
+  // Calculate total pages for UI controls, rounding up (e.g., 11 items / 10 limit = 2 pages)
   const totalPages = Math.ceil(totalItems / limit);
   const isFiltered = !!(q || tier);
 

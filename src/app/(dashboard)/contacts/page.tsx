@@ -13,8 +13,18 @@ export const metadata: Metadata = { title: "Contacts" };
 
 type ContactRow = Contact & { company: Pick<Company, "name"> | null };
 
+/**
+ * React Server Component displaying all CRM contacts.
+ * 
+ * Performs an SQL left-join to fetch the parent company's name,
+ * and renders contacts inside dynamic contact cards.
+ */
 export default async function ContactsPage() {
+  // Initialize server cookies Supabase client
   const supabase = await createClient();
+  
+  // Fetch all contacts sorted alphabetically by their full name.
+  // "company:companies(name)" retrieves the related company's name field.
   const { data } = await (supabase as any)
     .from("contacts").select("*, company:companies(name)").order("full_name");
   const contacts = (data ?? []) as ContactRow[];
@@ -23,6 +33,7 @@ export default async function ContactsPage() {
     <div>
       <PageHeader title="Contacts" subtitle={`${contacts.length} contacts across all companies`}>
         <div className="flex gap-2">
+          {/* Reusable export utility passing contacts array directly */}
           <ExportButton data={contacts} filename="contacts" />
           <Link href="/contacts/new"><Button><Plus size={16} />Add Contact</Button></Link>
         </div>
@@ -36,6 +47,11 @@ export default async function ContactsPage() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {contacts.map((c) => {
+            // Concept: Dynamic Avatar Initials Generation
+            // 1. Split full name by spaces into an array of words: "John Doe" -> ["John", "Doe"]
+            // 2. Map over each word, grabbing its first letter: ["J", "D"]
+            // 3. Join the letters back together: "JD"
+            // 4. Force upper casing and slice to maximum 2 characters: "JD"
             const initials = c.full_name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
             return (
               <div key={c.id} className="bg-white border border-gray-200 rounded-xl p-4 hover:shadow-md transition-shadow">

@@ -19,8 +19,23 @@ type OrderDetail = Order & {
   order_items: (OrderItem & { product: Pick<Product, "id" | "name" | "sku" | "category"> | null })[];
 };
 
+/**
+ * Server Component presenting details for a specific order.
+ * 
+ * Fetches order details, including nested related tables (companies, sales reps, 
+ * order items, and products), and dynamically passes values to interactive Client Components.
+ */
 export default async function OrderDetailPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
+  
+  // Fetch a single order record with nested multi-level relationship joins.
+  // Syntax:
+  // - "company:companies(id, name, tier)" joins the companies table (foreign key lookup).
+  // - "assigned_user:user_profiles(id, full_name)" joins the users table.
+  // - "order_items(*, product:products(id, name, sku, category))" joins order items AND
+  //   sub-joins products table for each line item!
+  //
+  // ".single()" tells Postgres to return a single JSON object instead of an array of objects.
   const { data } = await (supabase as any)
     .from("orders")
     .select(`
@@ -32,7 +47,9 @@ export default async function OrderDetailPage({ params }: { params: { id: string
     .eq("id", params.id)
     .single();
 
+  // If no order matches the ID, trigger Next.js 404 page rendering
   if (!data) notFound();
+  
   const order = data as OrderDetail;
 
   return (
