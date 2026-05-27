@@ -503,7 +503,13 @@ src/
 │   ├── (auth)/          # Authentication pages (Login, Register)
 │   ├── (dashboard)/     # Protected app pages
 │   │   ├── analytics/   # Analytics module (segment charts & RFM detail subcomponents)
+│   │   ├── companies/   # Company CRM management (lists, details, create/edit forms)
+│   │   ├── contacts/    # Contact management (lists, create contact forms)
 │   │   ├── dashboard/   # Dashboard module (top client & order status subcomponents)
+│   │   ├── orders/      # Sales order management (lists, details, multi-item creation forms)
+│   │   ├── products/    # Product catalog management (lists, detail, create/edit forms)
+│   │   ├── reports/     # Business reports module
+│   │   ├── settings/    # Role management and database transaction audit log viewer
 │   │   ├── loading.tsx  # Route-specific suspense skeleton screens
 │   │   └── error.tsx    # React error boundaries
 │   └── auth/callback/   # Supabase OAuth callback route handler
