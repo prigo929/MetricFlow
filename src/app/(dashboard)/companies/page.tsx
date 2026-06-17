@@ -10,8 +10,9 @@ import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency } from "@/lib/utils";
+import { parseListParams, buildSortHref } from "@/lib/list-params";
 import { Plus, Building2, Globe, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import type { Company } from "@/types";
+import type { Company, CompanyTier } from "@/types";
 
 export const metadata: Metadata = { title: "Companies" };
 
@@ -33,30 +34,18 @@ export default async function CompaniesPage({
 }) {
   // Create an authenticated Supabase client using server cookies context
   const supabase = await createClient();
-  
-  // Extract and normalize query parameters, fallback to defaults if not provided.
-  const q = searchParams.q || "";
+
+  // Parse the shared list params (search, page, limit, sort, order) + pagination range.
+  const { q, page, limit, sort, order, from, to } = parseListParams(searchParams, {
+    sort: "created_at",
+  });
+  // Secondary filter specific to this page.
   const tier = searchParams.tier || "";
-  
-  // Parse numeric pagination parameters. Always specify base 10 radix for parseInt safety.
-  const page = parseInt(searchParams.page || "1", 10);
-  const limit = parseInt(searchParams.limit || "10", 10);
-  
-  // Extract sorting column & order direction
-  const sort = searchParams.sort || "created_at";
-  const order = searchParams.order || "desc";
-  
-  // Pagination Math (0-indexed for SQL offsets):
-  // range(from, to) in Supabase is inclusive.
-  // For page 1, limit 10: from = 0, to = 9 (retrieves first 10 items)
-  // For page 2, limit 10: from = 10, to = 19 (retrieves next 10 items)
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
 
   // 1. Build the paginated list query
   // { count: "exact" } requests the total row count matching our filters, ignoring limits/range.
   // This lets us calculate total pages for pagination UI.
-  let listQuery = (supabase as any).from("companies").select("*", { count: "exact" });
+  let listQuery = supabase.from("companies").select("*", { count: "exact" });
   
   // Case-insensitive search filter using ILIKE
   if (q) {
@@ -65,7 +54,7 @@ export default async function CompaniesPage({
   
   // Exact value matching filter (e.g. tier = 'enterprise')
   if (tier) {
-    listQuery = listQuery.eq("tier", tier);
+    listQuery = listQuery.eq("tier", tier as CompanyTier);
   }
   
   // Execute paginated database query with order & range
@@ -76,12 +65,12 @@ export default async function CompaniesPage({
   // 2. Build the export query (Without limit or pagination range)
   // Why? When a user clicks "Export CSV", they want all matching results,
   // not just the current page's subset (e.g., they want all 100 matching rows, not just 10).
-  let exportQuery = (supabase as any).from("companies").select("*");
+  let exportQuery = supabase.from("companies").select("*");
   if (q) {
     exportQuery = exportQuery.ilike("name", `%${q}%`);
   }
   if (tier) {
-    exportQuery = exportQuery.eq("tier", tier);
+    exportQuery = exportQuery.eq("tier", tier as CompanyTier);
   }
   const { data: exportData } = await exportQuery.order(sort, { ascending: order === "asc" });
 
@@ -138,20 +127,11 @@ export default async function CompaniesPage({
                     { label: "Revenue", key: "annual_revenue", width: "w-[15%]" },
                   ].map((col) => {
                     const isSorted = sort === col.key;
-                    const nextOrder = isSorted && order === "asc" ? "desc" : "asc";
-                    
-                    const nextParams = new URLSearchParams();
-                    if (q) nextParams.set("q", q);
-                    if (tier) nextParams.set("tier", tier);
-                    nextParams.set("page", "1");
-                    if (limit) nextParams.set("limit", limit.toString());
-                    nextParams.set("sort", col.key);
-                    nextParams.set("order", nextOrder);
 
                     return (
                       <th key={col.key} className={`py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide text-left ${col.width}`}>
                         <Link
-                          href={`/companies?${nextParams.toString()}`}
+                          href={buildSortHref("/companies", searchParams, col.key, sort, order)}
                           className="flex items-center gap-1.5 hover:text-gray-900 transition-colors group"
                         >
                           {col.label}

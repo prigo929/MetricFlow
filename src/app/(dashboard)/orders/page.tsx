@@ -10,8 +10,9 @@ import { TableFilters } from "@/components/shared/TableFilters";
 import { ExportButton } from "@/components/shared/ExportButton";
 import { Pagination } from "@/components/shared/Pagination";
 import { formatCurrency, formatDate } from "@/lib/utils";
+import { parseListParams, buildSortHref } from "@/lib/list-params";
 import { Plus, ShoppingCart, ArrowUp, ArrowDown, ArrowUpDown } from "lucide-react";
-import type { Order, Company, UserProfile } from "@/types";
+import type { Order, Company, UserProfile, OrderStatus } from "@/types";
 
 export const metadata: Metadata = { title: "Orders" };
 
@@ -30,15 +31,12 @@ export default async function OrdersPage({
 }) {
   const supabase = await createClient();
   
-  // Parse incoming URL query strings, providing default values for page pagination
-  const q = searchParams.q || "";
+  // Parse the shared list params (search, page, limit, sort, order) + pagination range.
+  const { q, page, limit, sort, order, from, to } = parseListParams(searchParams, {
+    sort: "order_date",
+  });
+  // Secondary filter specific to this page.
   const status = searchParams.status || "";
-  const page = parseInt(searchParams.page || "1", 10);
-  const limit = parseInt(searchParams.limit || "10", 10);
-  const sort = searchParams.sort || "order_date";
-  const order = searchParams.order || "desc";
-  const from = (page - 1) * limit;
-  const to = from + limit - 1;
 
   // Concept: Cross-Table Relational Filtering in PostgREST
   // Supabase's API (PostgREST) is stateless and doesn't allow easy filtering of parent tables 
@@ -52,34 +50,34 @@ export default async function OrdersPage({
 
   if (q) {
     // Look up company IDs where name contains the search string
-    const { data: companies } = await (supabase as any)
+    const { data: companies } = await supabase
       .from("companies")
       .select("id")
       .ilike("name", `%${q}%`);
     if (companies) {
-      companyIds = companies.map((c: any) => c.id);
+      companyIds = companies.map((c) => c.id);
     }
 
     // Look up Sales Rep IDs where name contains the search string
-    const { data: users } = await (supabase as any)
+    const { data: users } = await supabase
       .from("user_profiles")
       .select("id")
       .ilike("full_name", `%${q}%`);
     if (users) {
-      userIds = users.map((u: any) => u.id);
+      userIds = users.map((u) => u.id);
     }
   }
 
   // Build paginated query
   // Syntax "company:companies(name)" renames the nested relational field from "companies" to "company"
   // and selects only the "name" column, performing a left-join on companies.company_id = orders.company_id.
-  let listQuery = (supabase as any)
+  let listQuery = supabase
     .from("orders")
     .select("*, company:companies(name), assigned_user:user_profiles(full_name)", { count: "exact" });
 
   // Filter orders by status if selected
   if (status) {
-    listQuery = listQuery.eq("status", status);
+    listQuery = listQuery.eq("status", status as OrderStatus);
   }
 
   // Construct dynamic OR conditions for the search query
@@ -108,12 +106,15 @@ export default async function OrdersPage({
 
   // Build a parallel export query (ignoring limits/range offset)
   // Ensures the exported CSV spreadsheet contains all filtered records, not just the active page.
-  let exportQuery = (supabase as any)
+  // The export also pulls order_items + product so the CSV can be flattened to one row per line.
+  let exportQuery = supabase
     .from("orders")
-    .select("*, company:companies(name), assigned_user:user_profiles(full_name)");
+    .select(
+      "*, company:companies(name), assigned_user:user_profiles(full_name), order_items(quantity, unit_price, line_total, product:products(name, sku))"
+    );
 
   if (status) {
-    exportQuery = exportQuery.eq("status", status);
+    exportQuery = exportQuery.eq("status", status as OrderStatus);
   }
 
   if (q) {
@@ -192,20 +193,11 @@ export default async function OrdersPage({
                     }
 
                     const isSorted = sort === col.key;
-                    const nextOrder = isSorted && order === "asc" ? "desc" : "asc";
-                    
-                    const nextParams = new URLSearchParams();
-                    if (q) nextParams.set("q", q);
-                    if (status) nextParams.set("status", status);
-                    nextParams.set("page", "1");
-                    if (limit) nextParams.set("limit", limit.toString());
-                    nextParams.set("sort", col.key);
-                    nextParams.set("order", nextOrder);
 
                     return (
                       <th key={col.key} className={`py-3 px-4 text-xs font-medium text-gray-500 uppercase tracking-wide text-left ${col.width}`}>
                         <Link
-                          href={`/orders?${nextParams.toString()}`}
+                          href={buildSortHref("/orders", searchParams, col.key, sort, order)}
                           className="flex items-center gap-1.5 hover:text-gray-900 transition-colors group"
                         >
                           {col.label}
