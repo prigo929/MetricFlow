@@ -36,7 +36,7 @@ export default async function OrderDetailPage({ params }: { params: { id: string
   //   sub-joins products table for each line item!
   //
   // ".single()" tells Postgres to return a single JSON object instead of an array of objects.
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from("orders")
     .select(`
       *,

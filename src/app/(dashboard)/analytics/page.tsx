@@ -66,7 +66,7 @@ export default async function AnalyticsPage({
   const startDate = getStartDate(range);
 
   // Fetch orders with nested details, filtering out drafts or cancelled orders
-  let query = (supabase as any)
+  let query = supabase
     .from("orders")
     .select(`
       *,
@@ -98,7 +98,7 @@ export default async function AnalyticsPage({
   // to the server terminal, but the rest of the analytics page still loads successfully.
   let rfmData: any[] = [];
   try {
-    const { data: rawRfm, error: rfmErr } = await (supabase as any)
+    const { data: rawRfm, error: rfmErr } = await supabase
       .from("v_rfm_segments")
       .select("*");
     if (!rfmErr && rawRfm) {

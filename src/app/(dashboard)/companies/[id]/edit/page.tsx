@@ -9,7 +9,7 @@ import type { Company } from "@/types";
 
 export default async function EditCompanyPage({ params }: { params: { id: string } }) {
   const supabase = await createClient();
-  const { data } = await (supabase as any).from("companies").select("*").eq("id", params.id).single();
+  const { data } = await supabase.from("companies").select("*").eq("id", params.id).single();
   if (!data) notFound();
   const company = data as Company;
 

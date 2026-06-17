@@ -22,7 +22,7 @@ export default async function ProductsPage() {
   const supabase = await createClient();
   
   // Fetch all products ordered alphabetically by name
-  const { data } = await (supabase as any).from("products").select("*").order("name");
+  const { data } = await supabase.from("products").select("*").order("name");
   const products = (data ?? []) as Product[];
 
   // Concept: In-Memory Array Filtering

@@ -30,11 +30,11 @@ export default async function CompanyDetailPage({ params }: { params: { id: stri
   // queries to Postgres simultaneously.
   const [{ data: co }, { data: contacts }, { data: orders }] = await Promise.all([
     // Get the specific company details
-    (supabase as any).from("companies").select("*").eq("id", params.id).single(),
+    supabase.from("companies").select("*").eq("id", params.id).single(),
     // Fetch all contacts linked to this company sorted alphabetically by name
-    (supabase as any).from("contacts").select("*").eq("company_id", params.id).order("full_name"),
+    supabase.from("contacts").select("*").eq("company_id", params.id).order("full_name"),
     // Fetch the 10 most recent orders for this company
-    (supabase as any).from("orders").select("*").eq("company_id", params.id).order("order_date", { ascending: false }).limit(10),
+    supabase.from("orders").select("*").eq("company_id", params.id).order("order_date", { ascending: false }).limit(10),
   ]);
 
   // If no company record matches the ID, render the default Next.js 404 page

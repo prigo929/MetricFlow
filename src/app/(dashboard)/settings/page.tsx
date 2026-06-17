@@ -21,7 +21,7 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   
   // 2. Fetch the corresponding profile information containing display name and role settings
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from("user_profiles").select("*").eq("id", user!.id).single();
   const profile = data as UserProfile | null;
 
@@ -40,10 +40,10 @@ export default async function SettingsPage() {
   if (profile?.role === "admin") {
     try {
       // Query all user profiles ordered alphabetically by name
-      const pRes = await (supabase as any).from("user_profiles").select("*").order("full_name");
+      const pRes = await supabase.from("user_profiles").select("*").order("full_name");
       
       // Query recent audit logs, performing a SQL JOIN to pull the name of the user who made the change
-      const lRes = await (supabase as any).from("audit_logs").select("*, changed_by_user:user_profiles(full_name)").order("changed_at", { ascending: false }).limit(50);
+      const lRes = await supabase.from("audit_logs").select("*, changed_by_user:user_profiles(full_name)").order("changed_at", { ascending: false }).limit(50);
       
       if (pRes.error || lRes.error) {
         // If query fails (e.g. audit_logs table does not exist yet), toggle warning state

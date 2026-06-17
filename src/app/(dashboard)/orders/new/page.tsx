@@ -14,9 +14,9 @@ export default async function NewOrderPage() {
   const { data: { user } } = await supabase.auth.getUser();
 
   const [{ data: companies }, { data: products }, { data: users }] = await Promise.all([
-    (supabase as any).from("companies").select("id, name").order("name"),
-    (supabase as any).from("products").select("id, name, sku, unit_price, stock_qty").eq("is_active", true).order("name"),
-    (supabase as any).from("user_profiles").select("id, full_name"),
+    supabase.from("companies").select("id, name").order("name"),
+    supabase.from("products").select("id, name, sku, unit_price, stock_qty").eq("is_active", true).order("name"),
+    supabase.from("user_profiles").select("id, full_name"),
   ]);
 
   return (

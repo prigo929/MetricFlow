@@ -25,7 +25,7 @@ export default async function ContactsPage() {
   
   // Fetch all contacts sorted alphabetically by their full name.
   // "company:companies(name)" retrieves the related company's name field.
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from("contacts").select("*, company:companies(name)").order("full_name");
   const contacts = (data ?? []) as ContactRow[];
 

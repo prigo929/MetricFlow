@@ -65,8 +65,8 @@ export default async function DashboardPage({
   const lastMonthEnd   = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split("T")[0];
 
   // Configure time-filtered queries
-  let rangeOrdersQuery = (supabase as any).from("orders").select("*, company:companies(id, name, tier)").not("status", "in", '("draft","cancelled")');
-  let rangeAllOrdersQuery = (supabase as any).from("orders").select("status");
+  let rangeOrdersQuery = supabase.from("orders").select("*, company:companies(id, name, tier)").not("status", "in", '("draft","cancelled")');
+  let rangeAllOrdersQuery = supabase.from("orders").select("status");
 
   if (startDate) {
     rangeOrdersQuery = rangeOrdersQuery.gte("order_date", startDate);
@@ -87,12 +87,12 @@ export default async function DashboardPage({
     { data: statusOrdersData },
     { data: lowStockProducts },
   ] = await Promise.all([
-    (supabase as any).from("orders").select("total_amount").gte("order_date", thisMonthStart).not("status", "in", '("draft","cancelled")'),
-    (supabase as any).from("orders").select("total_amount").gte("order_date", lastMonthStart).lte("order_date", lastMonthEnd).not("status", "in", '("draft","cancelled")'),
-    (supabase as any).from("companies").select("*", { count: "exact", head: true }),
+    supabase.from("orders").select("total_amount").gte("order_date", thisMonthStart).not("status", "in", '("draft","cancelled")'),
+    supabase.from("orders").select("total_amount").gte("order_date", lastMonthStart).lte("order_date", lastMonthEnd).not("status", "in", '("draft","cancelled")'),
+    supabase.from("companies").select("*", { count: "exact", head: true }),
     rangeOrdersQuery.order("order_date", { ascending: true }),
     rangeAllOrdersQuery,
-    (supabase as any).from("products").select("id, name, stock_qty").eq("is_active", true).lt("stock_qty", 10),
+    supabase.from("products").select("id, name, stock_qty").eq("is_active", true).lt("stock_qty", 10),
   ]);
 
   // Fetch Sales Intelligence alerts safely (degrades gracefully if view migrations aren't run yet)
@@ -100,7 +100,7 @@ export default async function DashboardPage({
   let velocityAlerts: any[] = [];
 
   try {
-    const { data: churnData, error: churnErr } = await (supabase as any)
+    const { data: churnData, error: churnErr } = await supabase
       .from("v_churn_risk")
       .select("*")
       .eq("is_at_risk", true);
@@ -112,7 +112,7 @@ export default async function DashboardPage({
   }
 
   try {
-    const { data: velocityData, error: velErr } = await (supabase as any)
+    const { data: velocityData, error: velErr } = await supabase
       .from("v_product_velocity")
       .select("*")
       .lte("days_to_stockout", 14)

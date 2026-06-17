@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "New Contact" };
 
 export default async function NewContactPage({ searchParams }: { searchParams: { company_id?: string } }) {
   const supabase = await createClient();
-  const { data } = await (supabase as any).from("companies").select("id, name").order("name");
+  const { data } = await supabase.from("companies").select("id, name").order("name");
   const companies = (data ?? []) as Pick<Company, "id" | "name">[];
   return (
     <div className="max-w-2xl">

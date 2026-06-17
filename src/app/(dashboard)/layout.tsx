@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const { data } = await (supabase as any)
+  const { data } = await supabase
     .from("user_profiles")
     .select("*")
     .eq("id", user.id)
