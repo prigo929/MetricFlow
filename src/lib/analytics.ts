@@ -1,3 +1,24 @@
+/**
+ * Minimal shape of an order (with its embedded relations) consumed by the aggregation
+ * helpers below. Kept deliberately loose — fields are optional/nullable — because the
+ * exact columns selected vary per page; the helpers only read what they need.
+ */
+export interface AnalyticsOrderItem {
+  product_id: string | null;
+  quantity: number | null;
+  line_total: number | null;
+  product?: { name?: string | null; category?: string | null } | null;
+}
+
+export interface AnalyticsOrder {
+  status: string;
+  order_date: string;
+  total_amount: number | null;
+  assigned_to?: string | null;
+  assigned_user?: { full_name?: string | null } | null;
+  order_items?: AnalyticsOrderItem[] | null;
+}
+
 export interface RevenueTrendPoint {
   name: string; // The text label for the chart axis (e.g. "May 26" or "May 26")
   revenue: number; // Sum of order total amounts
@@ -55,7 +76,7 @@ export function getStartDate(range: string): string | null {
  * We solve this by pre-generating a "gap-free calendar timeline" with values initialized to 0 (zero-filling),
  * and then overlaying our actual sales data.
  */
-export function aggregateRevenueTrend(orders: any[], range: string): RevenueTrendPoint[] {
+export function aggregateRevenueTrend(orders: AnalyticsOrder[], range: string): RevenueTrendPoint[] {
   // Exclude draft or cancelled orders from analytical totals
   const activeOrders = orders.filter((o) => o.status !== "draft" && o.status !== "cancelled");
   const now = new Date();
@@ -140,13 +161,13 @@ export function aggregateRevenueTrend(orders: any[], range: string): RevenueTren
  * Aggregates order item sales per product.
  * Combines order_items records and returns the top 10 best-selling items in the period.
  */
-export function aggregateProductPerformance(orders: any[]): ProductPerfPoint[] {
+export function aggregateProductPerformance(orders: AnalyticsOrder[]): ProductPerfPoint[] {
   const activeOrders = orders.filter((o) => o.status !== "draft" && o.status !== "cancelled");
   const productsMap: Record<string, ProductPerfPoint> = {};
 
   activeOrders.forEach((o) => {
     const items = o.order_items || [];
-    items.forEach((item: any) => {
+    items.forEach((item: AnalyticsOrderItem) => {
       const p = item.product || {};
       const productId = item.product_id;
       if (!productId) return;
@@ -177,7 +198,7 @@ export function aggregateProductPerformance(orders: any[]): ProductPerfPoint[] {
  * Aggregates orders per assigned sales representative.
  * Computes average order values (AOV) and revenue contribution in memory.
  */
-export function aggregateSalesRepPerformance(orders: any[]): SalesRepPoint[] {
+export function aggregateSalesRepPerformance(orders: AnalyticsOrder[]): SalesRepPoint[] {
   const activeOrders = orders.filter((o) => o.status !== "draft" && o.status !== "cancelled");
   const repsMap: Record<string, SalesRepPoint> = {};
 

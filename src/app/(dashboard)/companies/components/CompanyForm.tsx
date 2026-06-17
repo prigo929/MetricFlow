@@ -3,7 +3,7 @@ import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { companySchema } from "@/lib/validations/schemas";
+import { companySchema, type CompanyFormValues } from "@/lib/validations/schemas";
 import { createCompany, updateCompany } from "@/actions";
 import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
@@ -11,19 +11,6 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Company } from "@/types";
-
-// Explicit form value type matching what the form fields produce
-interface CompanyFormData {
-  name: string;
-  industry: string;
-  country: string;
-  city?: string;
-  tier: "enterprise" | "mid_market" | "smb";
-  annual_revenue?: string | number | null;
-  employee_count?: string | number | null;
-  website?: string;
-  notes?: string;
-}
 
 const TIER_OPTIONS = [
   { value: "enterprise", label: "Enterprise" },
@@ -46,7 +33,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
     handleSubmit,
     // `isSubmitting` is handled automatically by react-hook-form during async onSubmit execution
     formState: { errors, isSubmitting },
-  } = useForm<CompanyFormData>({
+  } = useForm<CompanyFormValues>({
     resolver: zodResolver(companySchema) as any,
     // If we have an existing company (EDIT mode), prefill form values.
     // Otherwise (CREATE mode), initialize defaults (e.g. SMB tier in Romania).
@@ -65,7 +52,7 @@ export function CompanyForm({ company }: CompanyFormProps) {
       : { tier: "smb", country: "Romania" },
   });
 
-  const onSubmit: SubmitHandler<CompanyFormData> = async (values) => {
+  const onSubmit: SubmitHandler<CompanyFormValues> = async (values) => {
     setServerError(null);
     
     // Choose which Server Action to invoke based on whether we are editing or creating
