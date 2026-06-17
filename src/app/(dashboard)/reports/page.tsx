@@ -24,13 +24,17 @@ export default async function ReportsPage() {
   
   // Fetch all orders except draft or cancelled orders.
   // Performs a left join to fetch the matching company's name and tier for report formatting.
-  const { data } = await (supabase as any)
+  // The table only needs scalar order fields + company name, but the CSV export performs
+  // relational flattening (one row per order line), so we also pull order_items + product.
+  const { data } = await supabase
     .from("orders")
-    .select("*, company:companies(name, tier)")
+    .select(
+      "*, company:companies(name, tier), order_items(quantity, unit_price, line_total, product:products(name, sku))"
+    )
     .not("status", "in", '("draft","cancelled")')
     .order("order_date", { ascending: false });
-    
-  const orders = (data ?? []) as OrderRow[];
+
+  const orders = (data ?? []) as unknown as OrderRow[];
   
   // Concept: In-Memory Accumulator
   // Using Array.prototype.reduce() to sum up the `total_amount` of all fetched orders.
