@@ -1,8 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, LogOut, ChevronDown } from "lucide-react";
+import { LogOut } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { NotificationsBell } from "./NotificationsBell";
 import type { UserProfile } from "@/types";
 
 export default function TopBar({ user }: { user: UserProfile | null }) {
@@ -27,10 +28,7 @@ export default function TopBar({ user }: { user: UserProfile | null }) {
       </div>
 
       <div className="flex items-center gap-3">
-        <button className="relative p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-          <Bell size={18} />
-          <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-brand-500 rounded-full" />
-        </button>
+        <NotificationsBell />
 
         <div className="flex items-center gap-2.5 pl-3 border-l border-gray-200">
           <div className="w-8 h-8 rounded-full bg-brand-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
