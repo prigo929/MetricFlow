@@ -30,7 +30,7 @@ If you are new to programming, React, Next.js, or cloud databases, here is a gui
 #### 2. Next.js App Router Pages & Search Parameters Routing
 *   **Concept**: Routing determines what URL paths load what code. We use query parameters (like `?q=search&page=2`) to share state between pages, allowing users to bookmark exact page configurations.
 *   **Where to study**:
-    *   [companies/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/companies/page.tsx): Explains Next.js `searchParams` parsing, base-10 parsing safety, and dynamic offset calculations (`(page - 1) * limit`).
+    *   [lib/list-params.ts](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/lib/list-params.ts) & [companies/page.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/app/(dashboard)/companies/page.tsx): Explains Next.js `searchParams` parsing, base-10 parsing safety, and dynamic offset calculations (`(page - 1) * limit`). The shared parsing and sort-link logic lives in `parseListParams` / `buildSortHref`, which the list pages consume.
     *   [TableFilters.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/shared/TableFilters.tsx): Learn how client forms update parameters, debouncing input value changes to prevent database overload.
 
 #### 3. Advanced Relational Joins & Sub-queries in Supabase (PostgREST)
@@ -52,7 +52,7 @@ If you are new to programming, React, Next.js, or cloud databases, here is a gui
 #### 6. Browser Memory Safety & Blob URLs
 *   **Concept**: Converting client memory objects into physical download attachments safely without causing memory leaks.
 *   **Where to study**:
-    *   [ExportButton.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/shared/ExportButton.tsx): Learn about JSON serialization, MIME types, `URL.createObjectURL()`, and garbage collection revocation.
+    *   [ExportButton.tsx](file:///Users/alinprigoreanu/Documents/Bachelor's%20Thesis/MetricFlow/src/components/shared/ExportButton.tsx): Learn about relational flattening, RFC 4180 CSV serialization, MIME types, `URL.createObjectURL()`, and garbage collection revocation.
 
 ---
 
@@ -437,23 +437,21 @@ Standard databases only record transactions when orders occur. This creates a da
     3. It then iterates over the fetched order history, aggregating totals into their corresponding keys.
     4. Finally, it sorts the keys chronologically, outputting a complete, gap-free array (e.g., a solid 30-day timeline) to feed the Recharts component.
 
-#### B. Strict Form Validation & Preemptive Stock Checks
-Forms in MetricFlow use React Hook Form combined with Zod schema verification (`src/lib/validations/schemas.ts`) to prevent bad data from reaching Server Actions:
+#### B. Two-Layer Stock Validation (Client + Server)
+Forms in MetricFlow use React Hook Form combined with Zod schema verification (`src/lib/validations/schemas.ts`) to prevent bad data from reaching Server Actions. Stock availability is validated on **both** layers — the client check is a fast-fail UX optimisation, while the server check is the authoritative safeguard:
 *   **Dynamic Casts**: Handles conversions (such as turning string inputs into numbers via Zod's `z.coerce.number()` or processing empty inputs to SQL-friendly `null` values via preprocessing).
-*   **Preemptive Stock Check Alerting**: Inside `OrderForm.tsx`, product dropdown selectors display the available inventory count. If an item has zero stock, its selection is disabled in the client UI. If a user sets an order quantity greater than the warehouse stock count, the form renders a real-time warning label (`Max X left!`).
-*   **Checkout Stock Block**: On submission, the client-side code iterates over the proposed items list. If any quantity exceeds database-reported stock availability:
-    - Submission is halted immediately.
-    - A descriptive warning banner is injected at the bottom of the form.
-    - A Radix UI Toast warning notification is launched.
-    - The Server Action is blocked, preventing unnecessary roundtrips to the database and preserving API resources.
+*   **Preemptive Stock Check Alerting (client)**: Inside `OrderForm.tsx`, product dropdown selectors display the available inventory count. If an item has zero stock, its selection is disabled in the client UI. If a user sets an order quantity greater than the warehouse stock count, the form renders a real-time warning label (`Max X left!`).
+*   **Checkout Stock Block (client)**: On submission, the client-side code iterates over the proposed items list. If any quantity exceeds database-reported stock availability, submission is halted immediately, a descriptive warning banner is injected at the bottom of the form, a Radix UI Toast warning is launched, and the Server Action is never invoked — sparing an unnecessary roundtrip to the database.
+*   **Authoritative Stock Re-check (server)**: The client check can be bypassed and is subject to race conditions (two reps ordering the last units at the same time). Therefore `createOrder` (in `src/actions/index.ts`) re-queries the live `stock_qty` straight from the database for every product referenced by the order — aggregating the requested quantity per product across all lines — and rejects the order with a descriptive error if any product is missing or short on stock. This is the definitive layer, executed against the source of truth before any write occurs.
 
 #### C. Relational Data Flattening (CSV Export Engine)
-Exporting JSON arrays directly to spreadsheets leads to unreadable cells when records contain nested relationships (such as a company object nested inside an order record).
-*   **How it works**: The custom client-side `ExportButton` component implements a key extraction filter:
-    1. It strips standard database IDs (`id`, `company_id`, `assigned_to`) from the header list.
-    2. It loops through the dataset and dynamically parses each field.
-    3. If it encounters a nested object, it checks for descriptive labels (e.g. `.name` or `.full_name`). It flattens this information into a simple string (extracting the company name or representative's name) rather than writing `[object Object]` into the cell.
-    4. The data is converted into a standard comma-separated text string, packaged into a Blob, and downloaded directly via a temporary browser anchor link.
+Supabase rows can embed both nested objects (e.g. a `company` object inside an order) and one-to-many child collections (e.g. an order's `order_items` array). A flat CSV cannot hold those directly, so the custom client-side `ExportButton` component performs a relational flattening pass:
+*   **How it works**:
+    1. It strips internal identifier columns (`id`, `company_id`, `assigned_to`, `order_id`, `product_id`, `created_by`) that carry no meaning for a business reader.
+    2. For each parent record it resolves nested objects to a display value, checking for descriptive labels (e.g. `.name` or `.full_name`) instead of writing `[object Object]`.
+    3. **One-to-many expansion**: if a record contains a non-empty child collection (such as `order_items`), each child is expanded into its **own CSV row**, with the parent's columns repeated on every line and the child's fields prefixed with `item_`. An order with three line items therefore produces three rows.
+    4. Every value is serialised with proper **RFC 4180** quoting (fields wrapped in quotes, embedded quotes doubled, records separated by CRLF), so commas or newlines inside a value never break the column layout.
+    5. The result is packaged into a `Blob`, downloaded via a temporary anchor link, and the object URL is immediately revoked (`URL.revokeObjectURL`) to free heap memory.
 
 #### D. SSR Hydration & Cookie Security
 Next.js Server Components inside MetricFlow render pages directly on the server before transferring HTML to the browser.
@@ -475,8 +473,9 @@ When users authenticate, Supabase redirects them back to the Next.js router with
 
 #### B. Unified Server Actions Mutation Layer (`src/actions/index.ts`)
 Next.js Server Actions execute securely as RPC endpoints. They run entirely on the server and are declared using the `"use server"` directive at the top of the file:
-*   **Form Mutations**: Instead of exposing raw API endpoints, our actions like `createOrder` receive validated form payloads, execute server queries inside transaction wrappers, and output standardized `ActionResult` payloads back to client states.
-*   **Type Safety**: Actions are typed with typescript, ensuring complete input validation matching database row structures.
+*   **Shared Guards**: Every mutation flows through one of two helpers — `withValidatedAuth` (parse the payload with Zod → require an authenticated user → run the query) or `withAuth` (auth only, for deletes and status changes). This removes the per-action boilerplate and guarantees a uniform error contract, including per-field validation errors (`fieldErrors`).
+*   **Form Mutations**: Instead of exposing raw API endpoints, our actions like `createOrder` receive validated form payloads, run their database writes, and output standardized `ActionResult` payloads back to client states. (Multi-step writes such as the order header + its line items are sequential inserts; financial atomicity for `total_amount` is guaranteed at the database level by the `sync_order_total` trigger rather than by an application transaction.)
+*   **Type Safety**: The Supabase client carries the generated `Database` types, so every query, insert and RPC call is checked against the real column and enum definitions at compile time — no `any` casts at the data-access boundary.
 *   **Dynamic Revalidations**: Triggers path revalidation (`revalidatePath`) to clear cached layout states, forcing pages to reload fresh rows without full page refreshes.
 
 #### C. Separation of Supabase Clients (`src/lib/supabase/`)
@@ -522,6 +521,7 @@ src/
 ├── lib/
 │   ├── supabase/        # Supabase client/server connection declarations & middleware
 │   ├── validations/     # Zod schemas for forms
+│   ├── list-params.ts   # Shared list-page helpers (searchParams parsing, sort links, pagination range)
 │   ├── utils.ts         # Formatting & styling helper functions (Tailwind cn, formatCurrency)
 │   └── analytics.ts     # Business logic analytical grouping & zero-fill timeline helpers
 └── types/               # Type systems declarations
