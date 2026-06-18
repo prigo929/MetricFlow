@@ -63,9 +63,9 @@ select
   c.name as company_name,
   c.tier,
   oi.days_since_last_order,
-  coalesce(oi.avg_days_between, 45) as avg_days_between, -- Default fallback of 45 days for single order clients
-  (oi.days_since_last_order > (coalesce(oi.avg_days_between, 45) * 1.5)) as is_at_risk,
-  round(oi.days_since_last_order::numeric / coalesce(oi.avg_days_between, 45)::numeric, 2) as risk_factor
+  coalesce(nullif(oi.avg_days_between, 0), 45) as avg_days_between, -- Fallback of 45 days for single-order clients OR clients whose orders all fall on the same day (avg = 0), avoiding division by zero
+  (oi.days_since_last_order > (coalesce(nullif(oi.avg_days_between, 0), 45) * 1.5)) as is_at_risk,
+  round(oi.days_since_last_order::numeric / coalesce(nullif(oi.avg_days_between, 0), 45)::numeric, 2) as risk_factor
 from public.companies c
 join order_intervals oi on oi.company_id = c.id;
 
