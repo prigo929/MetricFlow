@@ -267,19 +267,19 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 // ============================================================================
 
 /**
- * Creates an order and its associated line items (order_items) in a multi-step flow.
+ * Creates an order together with its line items.
  *
- * STOCK SAFETY (server-side, definitive layer):
- * Before any write, we re-query the live `stock_qty` of every product referenced by the
- * order straight from the database and reject the order if a requested quantity exceeds it.
- * This is the second of the two validation layers described in the thesis (§3.5.2): the
- * client-side check is a fast-fail UX optimisation, but the authoritative check happens here,
- * against the source of truth, closing the race-condition window where two reps could each
- * pass the client check and oversell the last units of a product.
+ * STOCK SAFETY (two server-side checks):
+ *   1. A friendly pre-check re-queries the live `stock_qty` so the common case returns a
+ *      clear, per-product message ("3 available, 5 requested") without touching the writer.
+ *   2. The actual write goes through the `create_order_atomic` RPC, which — inside a single
+ *      transaction — inserts the header, inserts each line, and DECREMENTS stock with a
+ *      guarded, row-locking UPDATE. That is the authoritative, race-safe layer: it serialises
+ *      concurrent orders for the same product and rolls everything back if stock runs out,
+ *      so there is no overselling and never an orphan order header.
  */
 export async function createOrder(formData: unknown): Promise<ActionResult<Order>> {
   return withValidatedAuth(orderSchema, formData, async (data, supabase) => {
-    // Separate the order header from its line items.
     const { items, ...orderData } = data;
 
     // 1. Aggregate the requested quantity per product (a product may appear on several lines).
@@ -291,7 +291,7 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
       );
     }
 
-    // 2. Re-read the authoritative stock levels for exactly those products.
+    // 2. Friendly pre-check (best-effort UX): surface a precise message before the write.
     const { data: stockRows, error: stockErr } = await supabase
       .from("products")
       .select("id, name, stock_qty")
@@ -300,8 +300,6 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
     if (stockErr) return { success: false, error: stockErr.message };
 
     const stockById = new Map(stockRows?.map((p) => [p.id, p]) ?? []);
-
-    // 3. Reject if any product is missing or short on stock.
     for (const [productId, requested] of Array.from(requestedByProduct.entries())) {
       const product = stockById.get(productId);
       if (!product) {
@@ -315,29 +313,21 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
       }
     }
 
-    // 4. Insert the order header record.
-    const { data: order, error: orderErr } = await supabase
-      .from("orders")
-      .insert(orderData)
-      .select()
-      .single();
+    // 3. Atomic write: header + line items + guarded stock decrement, all in one transaction.
+    const { data: order, error } = await supabase.rpc("create_order_atomic", {
+      p_company_id: orderData.company_id,
+      p_assigned_to: orderData.assigned_to,
+      p_status: orderData.status,
+      p_order_date: orderData.order_date,
+      p_expected_delivery: orderData.expected_delivery ?? null,
+      p_notes: orderData.notes ?? null,
+      p_items: items,
+    });
 
-    if (orderErr || !order) {
-      return { success: false, error: orderErr?.message ?? "Order creation failed" };
+    if (error || !order) {
+      return { success: false, error: error?.message ?? "Order creation failed" };
     }
 
-    // 5. Insert the line items, linking each one to the parent order via foreign key.
-    const itemRows = items.map((item) => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      quantity: item.quantity,
-      unit_price: item.unit_price,
-    }));
-
-    const { error: itemsErr } = await supabase.from("order_items").insert(itemRows);
-    if (itemsErr) return { success: false, error: itemsErr.message };
-
-    // Revalidate orders and the analytical dashboard.
     revalidatePath("/orders");
     revalidatePath("/dashboard");
     return { success: true, data: order, message: "Order created" };

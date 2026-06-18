@@ -484,6 +484,18 @@ export type Database = {
       }
     }
     Functions: {
+      create_order_atomic: {
+        Args: {
+          p_company_id: string
+          p_assigned_to: string
+          p_status: Database["public"]["Enums"]["order_status"]
+          p_order_date: string
+          p_expected_delivery: string | null
+          p_notes: string | null
+          p_items: Json
+        }
+        Returns: Database["public"]["Tables"]["orders"]["Row"]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: Database["public"]["Enums"]["user_role"]
