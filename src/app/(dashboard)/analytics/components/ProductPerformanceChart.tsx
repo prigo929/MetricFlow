@@ -13,8 +13,12 @@ export function ProductPerformanceChart({ data }: Props) {
     name: d.product_name.length > 18 ? d.product_name.slice(0, 18) + "…" : d.product_name,
   }));
 
+  // Reserve a vertical slot per product so every label is rendered. Recharts otherwise
+  // auto-thins category ticks (showing every other one) when they don't fit the height.
+  const chartHeight = Math.max(220, formatted.length * 34);
+
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={chartHeight}>
       <BarChart data={formatted} layout="vertical" margin={{ top: 0, right: 20, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f0f0f0" />
         <XAxis
@@ -24,6 +28,7 @@ export function ProductPerformanceChart({ data }: Props) {
         />
         <YAxis
           type="category" dataKey="name"
+          interval={0}
           tick={{ fontSize: 11, fill: "#6b7280" }} axisLine={false} tickLine={false} width={120}
         />
         <Tooltip
