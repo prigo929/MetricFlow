@@ -121,7 +121,7 @@ export default async function SettingsPage() {
                             <p className="text-xs text-gray-400">{p.email}</p>
                           </div>
                           {/* Role Selector component (Client Component) to update role privilege dynamically */}
-                          <RoleSelector userId={p.id} currentRole={p.role} />
+                          <RoleSelector userId={p.id} currentRole={p.role} isSelf={p.id === user!.id} />
                         </div>
                       ))}
                     </div>

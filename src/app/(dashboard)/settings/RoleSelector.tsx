@@ -7,9 +7,11 @@ import { toast } from "@/hooks/use-toast";
 interface Props {
   userId: string;
   currentRole: string;
+  /** True when this row is the logged-in admin's own account. */
+  isSelf?: boolean;
 }
 
-export function RoleSelector({ userId, currentRole }: Props) {
+export function RoleSelector({ userId, currentRole, isSelf = false }: Props) {
   const [role, setRole] = useState(currentRole);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +52,19 @@ export function RoleSelector({ userId, currentRole }: Props) {
       setLoading(false);
     }
   };
+
+  // An admin cannot change their own role here (it would risk locking themselves out of
+  // admin access). The server enforces this too; the UI just makes it clear.
+  if (isSelf) {
+    return (
+      <div className="flex flex-col gap-1 items-end">
+        <span className="px-2.5 py-1.5 text-xs font-medium text-gray-400 capitalize">
+          {currentRole.replace("_", " ")} (you)
+        </span>
+        <span className="text-[10px] text-gray-400">Your own role can't be changed here</span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1 items-end">
