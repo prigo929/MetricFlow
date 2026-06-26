@@ -1,9 +1,9 @@
 -- ============================================================
--- MetricFlow B2B Platform — Audit Logs and Role Management
--- Migration: 002_audit_logs_and_roles.sql
+-- Platforma B2B MetricFlow: jurnale de audit și gestionarea rolurilor
+-- Migrarea: 002_audit_logs_and_roles.sql
 -- ============================================================
 
--- ─── Audit Logs Table ───────────────────────────────────────
+-- ─── Tabela de jurnale de audit ───
 create table if not exists public.audit_logs (
   id           uuid primary key default uuid_generate_v4(),
   table_name   text not null,
@@ -15,10 +15,10 @@ create table if not exists public.audit_logs (
   changed_at   timestamptz not null default now()
 );
 
--- Enable RLS on audit logs
+-- Activează RLS pe jurnalele de audit
 alter table public.audit_logs enable row level security;
 
--- Policy: Only admins can view the audit logs
+-- Politică: doar adminii pot vedea jurnalele de audit
 create policy "Admins can view audit logs"
   on public.audit_logs for select
   using (
@@ -28,13 +28,13 @@ create policy "Admins can view audit logs"
     )
   );
 
--- ─── Audit Trigger Function ───────────────────────────
+-- ─── Funcția trigger de audit ───
 create or replace function public.process_audit_log()
 returns trigger as $$
 declare
   current_user_id uuid;
 begin
-  -- Resolve authenticated user executing the action
+  -- Identifică utilizatorul autentificat care execută acțiunea
   current_user_id := auth.uid();
 
   if (TG_OP = 'DELETE') then
@@ -54,24 +54,24 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- Attach triggers to companies table
+-- Atașează trigger-ele pe tabela companies
 drop trigger if exists audit_companies_trigger on public.companies;
 create trigger audit_companies_trigger
   after insert or update or delete on public.companies
   for each row execute procedure public.process_audit_log();
 
--- Attach triggers to orders table
+-- Atașează trigger-ele pe tabela orders
 drop trigger if exists audit_orders_trigger on public.orders;
 create trigger audit_orders_trigger
   after insert or update or delete on public.orders
   for each row execute procedure public.process_audit_log();
 
 
--- ─── Security Definer Role Manager RPC ──────────────────────
+-- ─── Funcție RPC SECURITY DEFINER pentru gestionarea rolurilor ───
 create or replace function public.update_user_role(target_user_id uuid, new_role user_role)
 returns void as $$
 begin
-  -- Secure check: verify that the executing user (auth.uid()) is an admin
+  -- Verificare de securitate: confirmă că utilizatorul curent (auth.uid()) este admin
   if not exists (
     select 1 from public.user_profiles
     where id = auth.uid() and role = 'admin'
@@ -85,5 +85,5 @@ begin
 end;
 $$ language plpgsql security definer;
 
--- Grant execute to authenticated users
+-- Acordă drept de execuție utilizatorilor autentificați
 grant execute on function public.update_user_role(uuid, user_role) to authenticated;

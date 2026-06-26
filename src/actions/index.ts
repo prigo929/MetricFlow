@@ -1,11 +1,11 @@
 "use server";
 
 /**
- * WHAT IS "use server"?
- * The directive at the top tells Next.js that EVERY function exported from this file
- * is a "Server Action". Next.js compiles these functions into secure HTTP POST endpoints.
- * You can call these functions directly from your client components (like forms) using standard
- * JavaScript functions, and they will execute safely on the backend server.
+ * CE ESTE "use server"?
+ * Directiva de sus îi spune Next.js că FIECARE funcție exportată din acest fișier
+ * este un "Server Action". Next.js le compilează în endpoint-uri HTTP POST securizate.
+ * Le poți apela direct din componentele client (ex. formulare) folosind funcții
+ * JavaScript obișnuite, iar ele se execută în siguranță pe server.
  */
 
 import { revalidatePath } from "next/cache";
@@ -28,16 +28,16 @@ import type {
 } from "@/types";
 
 /**
- * The fully typed Supabase server client, inferred from `createClient`.
- * Because the client carries the generated `Database` schema, every `.from(...)`,
- * `.insert(...)`, `.select(...)` and `.rpc(...)` call below is type-checked end-to-end —
- * column names, enum values and row shapes are all verified at compile time.
+ * Clientul Supabase de server, complet tipizat, dedus din createClient.
+ * Pentru că poartă schema Database generată, fiecare apel .from(...),
+ * .insert(...), .select(...) și .rpc(...) este verificat de tipuri cap-coadă:
+ * numele coloanelor, valorile enum și forma rândurilor sunt verificate la compilare.
  */
 type DbClient = Awaited<ReturnType<typeof createClient>>;
 
 /**
- * Normalises Zod's `flatten().fieldErrors` (whose values are `string[] | undefined`)
- * into the `Record<string, string[]>` shape expected by `ActionResult`.
+ * Normalizează flatten().fieldErrors de la Zod (cu valori string[] | undefined)
+ * în forma Record<string, string[]> așteptată de ActionResult.
  */
 function toFieldErrors(
   fieldErrors: Record<string, string[] | undefined>
@@ -50,13 +50,13 @@ function toFieldErrors(
 }
 
 /**
- * Shared guard for every *mutating* Server Action that accepts user input.
- * It enforces — in one place — the three steps the thesis documents for each mutation:
- *   1. VALIDATION  — parse the payload with Zod, returning per-field errors on failure.
- *   2. AUTH        — require an authenticated user (defence-in-depth on top of RLS).
- *   3. EXECUTION   — hand the validated data + authed client to the caller.
- * Centralising this removes the copy-pasted boilerplate that previously lived in
- * every create/update action and guarantees a consistent error contract.
+ * Gardă comună pentru fiecare Server Action de modificare care primește input.
+ * Impune, într-un singur loc, cei trei pași documentați în lucrare pentru fiecare mutație:
+ * 1. VALIDARE: parsează datele cu Zod, returnând erori pe câmpuri la eșec.
+ * 2. AUTENTIFICARE: cere un utilizator autentificat (apărare în adâncime peste RLS).
+ * 3. EXECUȚIE: predă datele validate + clientul autentificat apelantului.
+ * Centralizarea elimină codul repetitiv care exista anterior în
+ * fiecare acțiune create/update și garantează un contract de erori consecvent.
  */
 async function withValidatedAuth<TInput, TOut>(
   schema: ZodType<TInput>,
@@ -82,8 +82,8 @@ async function withValidatedAuth<TInput, TOut>(
 }
 
 /**
- * Same authentication guard, for actions that take no validated body
- * (deletes and status transitions that receive only an id / enum).
+ * Aceeași gardă de autentificare, pentru acțiuni fără corp validat
+ * (ștergeri și schimbări de status care primesc doar un id / enum).
  */
 async function withAuth<TOut>(
   run: (supabase: DbClient, userId: string) => Promise<ActionResult<TOut>>
@@ -97,11 +97,11 @@ async function withAuth<TOut>(
 }
 
 // ============================================================================
-// 🏢 Companies Server Actions
+// 🏢 Server Actions pentru Companii
 // ============================================================================
 
 /**
- * Creates a new company in the database.
+ * Creează o companie nouă în baza de date.
  */
 export async function createCompany(formData: unknown): Promise<ActionResult<Company>> {
   return withValidatedAuth(companySchema, formData, async (data, supabase, userId) => {
@@ -113,14 +113,14 @@ export async function createCompany(formData: unknown): Promise<ActionResult<Com
 
     if (error || !row) return { success: false, error: error?.message ?? "Insert failed" };
 
-    // Purge the cached render tree of /companies so the new row shows up immediately.
+    // Invalidează cache-ul pentru /companies ca noul rând să apară imediat.
     revalidatePath("/companies");
     return { success: true, data: row, message: "Company created" };
   });
 }
 
 /**
- * Updates an existing company in the database.
+ * Actualizează o companie existentă.
  */
 export async function updateCompany(id: string, formData: unknown): Promise<ActionResult<Company>> {
   return withValidatedAuth(companySchema, formData, async (data, supabase) => {
@@ -140,7 +140,7 @@ export async function updateCompany(id: string, formData: unknown): Promise<Acti
 }
 
 /**
- * Deletes a company by ID.
+ * Șterge o companie după ID.
  */
 export async function deleteCompany(id: string): Promise<ActionResult> {
   return withAuth(async (supabase) => {
@@ -153,11 +153,11 @@ export async function deleteCompany(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// 📞 Contacts Server Actions
+// 📞 Server Actions pentru Contacte
 // ============================================================================
 
 /**
- * Creates a new company contact (e.g. employee details).
+ * Creează o persoană de contact (ex. detalii angajat).
  */
 export async function createContact(formData: unknown): Promise<ActionResult<Contact>> {
   return withValidatedAuth(contactSchema, formData, async (data, supabase) => {
@@ -170,14 +170,14 @@ export async function createContact(formData: unknown): Promise<ActionResult<Con
     if (error || !row) return { success: false, error: error?.message ?? "Failed" };
 
     revalidatePath("/contacts");
-    // Also revalidate the parent company detail view so it lists this new contact.
+    // Invalidează și pagina companiei-părinte ca să afișeze noul contact.
     revalidatePath(`/companies/${data.company_id}`);
     return { success: true, data: row };
   });
 }
 
 /**
- * Updates a contact.
+ * Actualizează un contact.
  */
 export async function updateContact(id: string, formData: unknown): Promise<ActionResult<Contact>> {
   return withValidatedAuth(contactSchema, formData, async (data, supabase) => {
@@ -196,7 +196,7 @@ export async function updateContact(id: string, formData: unknown): Promise<Acti
 }
 
 /**
- * Deletes a contact.
+ * Șterge un contact.
  */
 export async function deleteContact(id: string): Promise<ActionResult> {
   return withAuth(async (supabase) => {
@@ -209,11 +209,11 @@ export async function deleteContact(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// 📦 Products Server Actions
+// 📦 Server Actions pentru Produse
 // ============================================================================
 
 /**
- * Creates a new product in the catalog.
+ * Creează un produs nou în catalog.
  */
 export async function createProduct(formData: unknown): Promise<ActionResult<Product>> {
   return withValidatedAuth(productSchema, formData, async (data, supabase) => {
@@ -231,7 +231,7 @@ export async function createProduct(formData: unknown): Promise<ActionResult<Pro
 }
 
 /**
- * Updates product details and stock status.
+ * Actualizează detaliile și stocul produsului.
  */
 export async function updateProduct(id: string, formData: unknown): Promise<ActionResult<Product>> {
   return withValidatedAuth(productSchema, formData, async (data, supabase) => {
@@ -250,7 +250,7 @@ export async function updateProduct(id: string, formData: unknown): Promise<Acti
 }
 
 /**
- * Deletes a product.
+ * Șterge un produs.
  */
 export async function deleteProduct(id: string): Promise<ActionResult> {
   return withAuth(async (supabase) => {
@@ -263,26 +263,26 @@ export async function deleteProduct(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// 🛒 Orders Server Actions
+// 🛒 Server Actions pentru Comenzi
 // ============================================================================
 
 /**
- * Creates an order together with its line items.
+ * Creează o comandă împreună cu liniile ei.
  *
- * STOCK SAFETY (two server-side checks):
- *   1. A friendly pre-check re-queries the live `stock_qty` so the common case returns a
- *      clear, per-product message ("3 available, 5 requested") without touching the writer.
- *   2. The actual write goes through the `create_order_atomic` RPC, which — inside a single
- *      transaction — inserts the header, inserts each line, and DECREMENTS stock with a
- *      guarded, row-locking UPDATE. That is the authoritative, race-safe layer: it serialises
- *      concurrent orders for the same product and rolls everything back if stock runs out,
- *      so there is no overselling and never an orphan order header.
+ * SIGURANȚA STOCULUI (două verificări pe server):
+ * 1. O pre-verificare prietenoasă reinterogă stock_qty curent, ca în cazul comun să returneze
+ * un mesaj clar pe produs ("3 disponibile, 5 cerute") fără a atinge scrierea.
+ * 2. Scrierea efectivă trece prin RPC-ul create_order_atomic, care, într-o singură
+ * tranzacție, inserează antetul, inserează fiecare linie și DECREMENTEAZĂ stocul printr-un
+ * UPDATE protejat, cu blocare de rând. Acesta e stratul autoritativ, sigur la concurență: serializează
+ * comenzile concurente pentru același produs și anulează tot dacă stocul se epuizează,
+ * deci nu există overselling și niciun antet de comandă orfan.
  */
 export async function createOrder(formData: unknown): Promise<ActionResult<Order>> {
   return withValidatedAuth(orderSchema, formData, async (data, supabase) => {
     const { items, ...orderData } = data;
 
-    // 1. Aggregate the requested quantity per product (a product may appear on several lines).
+    // 1. Agregă cantitatea cerută pe produs (un produs poate apărea pe mai multe linii).
     const requestedByProduct = new Map<string, number>();
     for (const item of items) {
       requestedByProduct.set(
@@ -291,7 +291,7 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
       );
     }
 
-    // 2. Friendly pre-check (best-effort UX): surface a precise message before the write.
+    // 2. Pre-verificare prietenoasă (UX): afișează un mesaj precis înainte de scriere.
     const { data: stockRows, error: stockErr } = await supabase
       .from("products")
       .select("id, name, stock_qty")
@@ -313,7 +313,7 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
       }
     }
 
-    // 3. Atomic write: header + line items + guarded stock decrement, all in one transaction.
+    // 3. Scriere atomică: antet + linii + decrementare de stoc protejată, într-o singură tranzacție.
     const { data: order, error } = await supabase.rpc("create_order_atomic", {
       p_company_id: orderData.company_id,
       p_assigned_to: orderData.assigned_to,
@@ -335,7 +335,7 @@ export async function createOrder(formData: unknown): Promise<ActionResult<Order
 }
 
 /**
- * Updates order delivery/processing status.
+ * Actualizează statusul de livrare/procesare al comenzii.
  */
 export async function updateOrderStatus(id: string, status: OrderStatus): Promise<ActionResult<Order>> {
   return withAuth(async (supabase) => {
@@ -356,7 +356,7 @@ export async function updateOrderStatus(id: string, status: OrderStatus): Promis
 }
 
 /**
- * Deletes an order.
+ * Șterge o comandă.
  */
 export async function deleteOrder(id: string): Promise<ActionResult> {
   return withAuth(async (supabase) => {
@@ -369,13 +369,13 @@ export async function deleteOrder(id: string): Promise<ActionResult> {
 }
 
 // ============================================================================
-// 👤 Users Server Actions
+// 👤 Server Actions pentru Utilizatori
 // ============================================================================
 
 /**
- * Updates a user role privilege in the application database.
- * Invokes a PostgreSQL RPC function (SECURITY DEFINER) that itself verifies the caller
- * is an admin before applying the change — see migration 002.
+ * Actualizează rolul (privilegiul) unui utilizator în baza de date.
+ * Apelează o funcție RPC PostgreSQL (SECURITY DEFINER) care verifică ea însăși că apelantul
+ * este admin înainte de a aplica schimbarea (vezi migrarea 002).
  */
 export async function updateUserRole(targetUserId: string, newRole: string): Promise<ActionResult> {
   return withAuth(async (supabase) => {

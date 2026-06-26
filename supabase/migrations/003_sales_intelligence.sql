@@ -1,8 +1,8 @@
--- ─── RFM Customer Segmentation ───────────────────────────────────────────────
--- Recency: Days since last order
--- Frequency: Total order count
--- Monetary: Total order amount
--- Ranking is performed using NTILE(4) over non-cancelled/non-draft orders.
+-- ─── Segmentare clienți RFM ───
+-- Recency: zile de la ultima comandă
+-- Frequency: numărul total de comenzi
+-- Monetary: valoarea totală a comenzilor
+-- Clasificarea se face cu NTILE(4) pe comenzile care nu sunt draft/anulate.
 create or replace view public.v_rfm_segments as
 with raw_metrics as (
   select
@@ -20,9 +20,9 @@ with raw_metrics as (
 scores as (
   select
     *,
-    ntile(4) over (order by recency desc) as r_score, -- Older last dates get 1, more recent gets 4
-    ntile(4) over (order by frequency asc) as f_score, -- Fewer orders gets 1, more orders gets 4
-    ntile(4) over (order by monetary asc) as m_score   -- Smaller spend gets 1, larger spend gets 4
+    ntile(4) over (order by recency desc) as r_score, -- datele mai vechi primesc 1, cele mai recente 4
+    ntile(4) over (order by frequency asc) as f_score, -- mai puține comenzi primesc 1, mai multe primesc 4
+    ntile(4) over (order by monetary asc) as m_score   -- cheltuieli mai mici primesc 1, mai mari primesc 4
   from raw_metrics
 )
 select
@@ -40,9 +40,9 @@ select
   end as rfm_segment
 from scores;
 
--- ─── Automated Churn Risk Detection ──────────────────────────────────────────
--- Compares current days since last order against historical intervals.
--- Flags company as risk if days_since_last_order > average_days_between_orders * 1.5.
+-- ─── Detecție automată a riscului de churn ───
+-- Compară zilele de la ultima comandă cu intervalele istorice.
+-- Marchează clientul ca risc dacă days_since_last_order > media_intervalelor * 1.5.
 create or replace view public.v_churn_risk as
 with order_intervals as (
   select
@@ -63,14 +63,14 @@ select
   c.name as company_name,
   c.tier,
   oi.days_since_last_order,
-  coalesce(nullif(oi.avg_days_between, 0), 45) as avg_days_between, -- Fallback of 45 days for single-order clients OR clients whose orders all fall on the same day (avg = 0), avoiding division by zero
+  coalesce(nullif(oi.avg_days_between, 0), 45) as avg_days_between, -- valoare implicită de 45 de zile pentru clienții cu o singură comandă SAU cu toate comenzile în aceeași zi (medie = 0), evitând împărțirea la zero
   (oi.days_since_last_order > (coalesce(nullif(oi.avg_days_between, 0), 45) * 1.5)) as is_at_risk,
   round(oi.days_since_last_order::numeric / coalesce(nullif(oi.avg_days_between, 0), 45)::numeric, 2) as risk_factor
 from public.companies c
 join order_intervals oi on oi.company_id = c.id;
 
--- ─── Product Velocity and Stockout Prediction ───────────────────────────────
--- Evaluates daily run rate over the last 30 days to predict depletion.
+-- ─── Viteza de vânzare și predicția epuizării stocului ───
+-- Evaluează ritmul zilnic din ultimele 30 de zile pentru a estima epuizarea.
 create or replace view public.v_product_velocity as
 with sales_last_30_days as (
   select
@@ -94,7 +94,7 @@ select
     when coalesce(s.total_units_sold, 0) > 0 then
       least(round(p.stock_qty::numeric / (coalesce(s.total_units_sold, 0)::numeric / 30.0), 0), 999)
     else
-      999 -- Low velocity / No risk
+      999 -- viteză mică / fără risc
   end as days_to_stockout
 from public.products p
 left join sales_last_30_days s on s.product_id = p.id

@@ -1,13 +1,13 @@
 -- ============================================================
--- MetricFlow B2B Platform — Database Schema
--- Migration: 001_initial_schema.sql
--- Run this in: Supabase Dashboard > SQL Editor
+-- Platforma B2B MetricFlow: schema bazei de date
+-- Migrarea: 001_initial_schema.sql
+-- Se rulează în: Supabase Dashboard > SQL Editor
 -- ============================================================
 
--- ─── Extensions ──────────────────────────────────────────────────────────────
+-- ─── Extensii ───
 create extension if not exists "uuid-ossp";
 
--- ─── Enums ───────────────────────────────────────────────────────────────────
+-- ─── Tipuri enumerate ───
 create type user_role as enum ('admin', 'sales_rep', 'viewer');
 create type order_status as enum (
   'draft', 'pending', 'confirmed', 'processing',
@@ -18,9 +18,9 @@ create type product_category as enum (
   'software', 'hardware', 'services', 'consulting', 'support'
 );
 
--- ─── user_profiles ───────────────────────────────────────────────────────────
--- Extends Supabase auth.users with application-level profile data.
--- Linked via trigger so every new auth user gets a profile row automatically.
+-- ─── user_profiles: profiluri utilizatori (rol, nume) ───
+-- Extinde auth.users (Supabase) cu date de profil specifice aplicației.
+-- Legat prin trigger: fiecare utilizator nou primește automat un rând de profil.
 create table public.user_profiles (
   id          uuid primary key references auth.users(id) on delete cascade,
   email       text not null,
@@ -31,7 +31,7 @@ create table public.user_profiles (
   updated_at  timestamptz not null default now()
 );
 
--- Auto-create profile on user signup
+-- Creează automat profilul la înregistrarea utilizatorului
 create or replace function public.handle_new_user()
 returns trigger as $$
 begin
@@ -49,7 +49,7 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute procedure public.handle_new_user();
 
--- ─── companies ───────────────────────────────────────────────────────────────
+-- ─── companies: companii (clienții B2B) ───
 create table public.companies (
   id              uuid primary key default uuid_generate_v4(),
   name            text not null,
@@ -69,7 +69,7 @@ create table public.companies (
 create index idx_companies_tier on public.companies(tier);
 create index idx_companies_country on public.companies(country);
 
--- ─── contacts ────────────────────────────────────────────────────────────────
+-- ─── contacts: persoane de contact ───
 create table public.contacts (
   id          uuid primary key default uuid_generate_v4(),
   company_id  uuid not null references public.companies(id) on delete cascade,
@@ -84,7 +84,7 @@ create table public.contacts (
 
 create index idx_contacts_company on public.contacts(company_id);
 
--- ─── products ────────────────────────────────────────────────────────────────
+-- ─── products: produse din catalog ───
 create table public.products (
   id           uuid primary key default uuid_generate_v4(),
   name         text not null,
@@ -101,7 +101,7 @@ create table public.products (
 create index idx_products_category on public.products(category);
 create index idx_products_active on public.products(is_active);
 
--- ─── orders ──────────────────────────────────────────────────────────────────
+-- ─── orders: comenzi (antet) ───
 create table public.orders (
   id                uuid primary key default uuid_generate_v4(),
   order_number      text not null unique default 'ORD-' || upper(substr(uuid_generate_v4()::text, 1, 8)),
@@ -121,7 +121,7 @@ create index idx_orders_status on public.orders(status);
 create index idx_orders_date on public.orders(order_date desc);
 create index idx_orders_assigned on public.orders(assigned_to);
 
--- ─── order_items ─────────────────────────────────────────────────────────────
+-- ─── order_items: linii de comandă (legătură comenzi–produse) ───
 create table public.order_items (
   id          uuid primary key default uuid_generate_v4(),
   order_id    uuid not null references public.orders(id) on delete cascade,
@@ -134,7 +134,7 @@ create table public.order_items (
 create index idx_order_items_order on public.order_items(order_id);
 create index idx_order_items_product on public.order_items(product_id);
 
--- ─── Auto-update order total when items change ───────────────────────────────
+-- ─── Actualizare automată a totalului la modificarea liniilor ───
 create or replace function public.recalculate_order_total()
 returns trigger as $$
 begin
@@ -155,7 +155,7 @@ create trigger sync_order_total
   after insert or update or delete on public.order_items
   for each row execute procedure public.recalculate_order_total();
 
--- ─── updated_at trigger helper ────────────────────────────────────────────────
+-- ─── Trigger ajutător pentru updated_at ───
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -169,9 +169,9 @@ create trigger set_contacts_updated_at   before update on public.contacts   for 
 create trigger set_products_updated_at   before update on public.products   for each row execute procedure public.set_updated_at();
 create trigger set_orders_updated_at     before update on public.orders     for each row execute procedure public.set_updated_at();
 
--- ─── Analytics views ─────────────────────────────────────────────────────────
+-- ─── Vizualizări analitice ───
 
--- Monthly revenue view (used by dashboard chart)
+-- Vizualizare venit lunar (folosită de graficul din dashboard)
 create or replace view public.v_revenue_by_month as
 select
   to_char(o.order_date, 'YYYY-MM') as month,
@@ -182,7 +182,7 @@ where o.status not in ('draft', 'cancelled')
 group by 1
 order by 1;
 
--- Top customers view
+-- Vizualizare top clienți
 create or replace view public.v_top_customers as
 select
   c.id           as company_id,
@@ -197,7 +197,7 @@ where o.status not in ('draft', 'cancelled')
 group by c.id, c.name, c.tier
 order by total_revenue desc;
 
--- Product performance view
+-- Vizualizare performanță produse
 create or replace view public.v_product_performance as
 select
   p.id           as product_id,
@@ -212,7 +212,7 @@ where o.status not in ('draft', 'cancelled')
 group by p.id, p.name, p.category
 order by revenue desc;
 
--- Sales rep performance
+-- Performanța reprezentanților de vânzări
 create or replace view public.v_sales_by_rep as
 select
   up.id           as user_id,
@@ -226,9 +226,9 @@ where o.status not in ('draft', 'cancelled')
 group by up.id, up.full_name
 order by total_revenue desc;
 
--- ─── Row Level Security ───────────────────────────────────────────────────────
--- Thesis talking point: RLS enforces access control at the DB layer,
--- not the application layer. Even a compromised API key cannot bypass it.
+-- ─── Securitate la nivel de rând (RLS) ───
+-- Idee-cheie: RLS impune controlul accesului la nivelul bazei de date,
+-- nu la nivelul aplicației. Nici măcar o cheie API compromisă nu îl poate ocoli.
 
 alter table public.user_profiles enable row level security;
 alter table public.companies     enable row level security;
@@ -237,7 +237,7 @@ alter table public.products      enable row level security;
 alter table public.orders        enable row level security;
 alter table public.order_items   enable row level security;
 
--- user_profiles: users see only their own profile; admins see all
+-- user_profiles: utilizatorii își văd doar propriul profil; adminii văd tot
 create policy "Users can view their own profile"
   on public.user_profiles for select
   using (auth.uid() = id);
@@ -255,7 +255,7 @@ create policy "Users can update their own profile"
   on public.user_profiles for update
   using (auth.uid() = id);
 
--- companies: all authenticated users can read; only admins/sales_reps can write
+-- companies: toți utilizatorii autentificați pot citi; doar adminii/reprezentanții pot scrie
 create policy "Authenticated users can view companies"
   on public.companies for select
   using (auth.uid() is not null);
@@ -269,7 +269,7 @@ create policy "Sales reps and admins can manage companies"
     )
   );
 
--- contacts: same as companies
+-- contacts: la fel ca la companies
 create policy "Authenticated users can view contacts"
   on public.contacts for select
   using (auth.uid() is not null);
@@ -283,7 +283,7 @@ create policy "Sales reps and admins can manage contacts"
     )
   );
 
--- products: all authenticated users can read; only admins can write
+-- products: toți utilizatorii autentificați pot citi; doar adminii pot scrie
 create policy "Authenticated users can view products"
   on public.products for select
   using (auth.uid() is not null);
@@ -297,7 +297,7 @@ create policy "Admins can manage products"
     )
   );
 
--- orders: sales reps see only their own; admins see all
+-- orders: reprezentanții văd doar comenzile proprii; adminii văd tot
 create policy "Sales reps see their own orders"
   on public.orders for select
   using (
@@ -327,7 +327,7 @@ create policy "Sales reps can update their own orders"
     )
   );
 
--- order_items: follow parent order's RLS
+-- order_items: urmează politica RLS a comenzii-părinte
 create policy "View order items for accessible orders"
   on public.order_items for select
   using (
@@ -360,7 +360,7 @@ create policy "Manage order items for accessible orders"
     )
   );
 
--- Grant views access to authenticated users
+-- Acordă acces la vizualizări utilizatorilor autentificați
 grant select on public.v_revenue_by_month    to authenticated;
 grant select on public.v_top_customers       to authenticated;
 grant select on public.v_product_performance to authenticated;

@@ -1,22 +1,22 @@
 -- ============================================================
--- MetricFlow B2B Platform — RLS Recursion Fix
--- Migration: 004_fix_rls_recursion.sql
+-- Platforma B2B MetricFlow: corecția recursivității RLS
+-- Migrarea: 004_fix_rls_recursion.sql
 -- ============================================================
 --
--- WHY THIS MIGRATION EXISTS:
--- The role-based policies in 001/002 checked the caller's role with an inline
--- `exists (select 1 from public.user_profiles where id = auth.uid() and role = ...)`.
--- When that pattern appears in a policy ON `user_profiles` itself, evaluating the
--- policy re-triggers the same policy → PostgreSQL aborts with
+-- DE CE EXISTĂ ACEASTĂ MIGRARE:
+-- Politicile pe roluri din 001/002 verificau rolul apelantului printr-un
+-- exists (select 1 from public.user_profiles where id = auth.uid() and role = ...) inline.
+-- Când acest tipar apare într-o politică CHIAR PE user_profiles, evaluarea
+-- politicii redeclanșează aceeași politică → PostgreSQL eșuează cu
 -- "infinite recursion detected in policy for relation user_profiles".
 --
--- THE FIX:
--- A `SECURITY DEFINER` helper, `get_user_role`, reads the role while bypassing RLS
--- (it runs with the owner's privileges), so it never re-enters the policy. All
--- role checks are rewritten to call it. `set search_path = public` hardens the
--- function against search-path hijacking, a known SECURITY DEFINER pitfall.
+-- SOLUȚIA:
+-- O funcție ajutătoare SECURITY DEFINER, get_user_role, citește rolul ocolind RLS
+-- (rulează cu privilegiile proprietarului), deci nu reintră niciodată în politică. Toate
+-- verificările de rol sunt rescrise să o apeleze. set search_path = public protejează
+-- funcția împotriva deturnării search-path, o capcană cunoscută a SECURITY DEFINER.
 
--- 1. Drop the recursive / role-checking policies created in 001 and 002.
+-- 1. Șterge politicile recursive / de verificare a rolului create în 001 și 002.
 drop policy if exists "Admins can view all profiles" on public.user_profiles;
 drop policy if exists "Sales reps and admins can manage companies" on public.companies;
 drop policy if exists "Sales reps and admins can manage contacts" on public.contacts;
@@ -28,7 +28,7 @@ drop policy if exists "View order items for accessible orders" on public.order_i
 drop policy if exists "Manage order items for accessible orders" on public.order_items;
 drop policy if exists "Admins can view audit logs" on public.audit_logs;
 
--- 2. SECURITY DEFINER helper to read a user's role without re-entering RLS.
+-- 2. Funcție ajutătoare SECURITY DEFINER care citește rolul fără a reintra în RLS.
 create or replace function public.get_user_role(user_id uuid)
 returns user_role
 language plpgsql
@@ -43,7 +43,7 @@ begin
 end;
 $$;
 
--- 3. Re-create the policies using the helper function.
+-- 3. Recreează politicile folosind funcția ajutătoare.
 create policy "Admins can view all profiles"
   on public.user_profiles for select
   using (public.get_user_role(auth.uid()) = 'admin');
@@ -102,8 +102,8 @@ create policy "Admins can view audit logs"
   on public.audit_logs for select
   using (public.get_user_role(auth.uid()) = 'admin');
 
--- 4. Bootstrap the demo administrator account (matches the thesis test users).
---    Safe to re-run; no-op if the account does not exist yet.
+-- 4. Inițializează contul de administrator demo (corespunde utilizatorilor de test din lucrare).
+-- Se poate re-rula în siguranță; fără efect dacă contul nu există încă.
 update public.user_profiles
 set role = 'admin'
 where email = 'admin@metricflow.com';

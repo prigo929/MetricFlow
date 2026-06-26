@@ -1,10 +1,10 @@
 """
-MetricFlow — Realistic B2B Seed Data Generator
-Generates SQL INSERT statements for demo data.
-Run: python seed_data.py > seed.sql
-Then paste seed.sql into Supabase SQL Editor.
+MetricFlow: generator de date demo B2B realiste
+Generează instrucțiuni SQL INSERT pentru datele demo.
+Rulare: python seed_data.py > seed.sql
+Apoi lipește seed.sql în Supabase SQL Editor.
 
-Requires: pip install faker
+Necesită: pip install faker
 """
 
 import random
@@ -15,16 +15,16 @@ from faker import Faker
 fake = Faker("ro_RO")
 random.seed(42)
 
-# ─── Config ──────────────────────────────────────────────────────────────────
+# ─── Configurare ───
 NUM_COMPANIES  = 30
 NUM_CONTACTS   = 60
 NUM_PRODUCTS   = 20
 NUM_ORDERS     = 120
-ADMIN_USER_ID  = "6f6eaf39-4fae-4d82-9c9e-5edaf0065da5"  # paste from Supabase Auth dashboard
-REP_USER_ID    = "ec008aba-3e7a-4306-83fc-4d806ed5759a"  # sales rep (rep@metricflow.com) — paste from Supabase Auth dashboard
-SALES_TEAM     = [ADMIN_USER_ID, REP_USER_ID]            # orders are distributed across the team
+ADMIN_USER_ID  = "6f6eaf39-4fae-4d82-9c9e-5edaf0065da5"  # se copiază din panoul Supabase Auth
+REP_USER_ID    = "ec008aba-3e7a-4306-83fc-4d806ed5759a"  # reprezentant (rep@metricflow.com), se copiază din panoul Supabase Auth
+SALES_TEAM     = [ADMIN_USER_ID, REP_USER_ID]  # comenzile sunt distribuite în echipă
 
-# ─── Reference data ───────────────────────────────────────────────────────────
+# ─── Date de referință ───
 INDUSTRIES = ["Technology", "Manufacturing", "Retail", "Healthcare", "Finance",
                "Logistics", "Energy", "Consulting", "Education", "Real Estate"]
 COUNTRIES  = ["Romania", "Romania", "Romania", "Germany", "France", "Hungary", "Bulgaria"]
@@ -73,7 +73,7 @@ print("TRUNCATE TABLE public.contacts CASCADE;")
 print("TRUNCATE TABLE public.companies CASCADE;")
 print("TRUNCATE TABLE public.products CASCADE;\n")
 
-# ─── Products ─────────────────────────────────────────────────────────────────
+# ─── Produse ───
 product_ids = [uid() for _ in PRODUCT_DATA]
 print("-- PRODUCTS")
 for pid, (name, sku, cat, price) in zip(product_ids, PRODUCT_DATA):
@@ -83,7 +83,7 @@ for pid, (name, sku, cat, price) in zip(product_ids, PRODUCT_DATA):
 
 print()
 
-# ─── Companies ────────────────────────────────────────────────────────────────
+# ─── Companii ───
 company_ids = [uid() for _ in range(NUM_COMPANIES)]
 print("-- COMPANIES")
 random.shuffle(TIERS)
@@ -103,7 +103,7 @@ for cid, tier in zip(company_ids, TIERS):
 
 print()
 
-# ─── Contacts ─────────────────────────────────────────────────────────────────
+# ─── Persoane de contact ───
 TITLES = ["CEO", "CFO", "CTO", "VP Sales", "Procurement Manager",
           "IT Director", "Operations Manager", "Account Manager"]
 print("-- CONTACTS")
@@ -120,7 +120,7 @@ for _ in range(NUM_CONTACTS):
 
 print()
 
-# ─── Orders ───────────────────────────────────────────────────────────────────
+# ─── Comenzi ───
 print("-- ORDERS")
 order_ids = []
 start_date = date.today() - timedelta(days=365)
@@ -133,13 +133,13 @@ for i in range(NUM_ORDERS):
     ord_date = (date.today() - timedelta(days=days_ago)).isoformat()
     del_date = (date.today() - timedelta(days=days_ago - random.randint(7, 30))).isoformat()
     num      = f"ORD-{str(i+1001)}"
-    rep      = random.choice(SALES_TEAM)  # distribute orders across the sales team
+    rep      = random.choice(SALES_TEAM)  # distribuie comenzile în echipa de vânzări
     print(f"INSERT INTO public.orders (id, order_number, company_id, assigned_to, status, order_date, expected_delivery) "
           f"VALUES ('{oid}', '{num}', '{comp}', '{rep}', '{status}', '{ord_date}', '{del_date}') ON CONFLICT (id) DO NOTHING;")
 
 print()
 
-# ─── Order Items ──────────────────────────────────────────────────────────────
+# ─── Linii de comandă ───
 print("-- ORDER ITEMS (trigger will auto-update order totals)")
 for oid in order_ids:
     num_items = random.randint(1, 4)

@@ -1,19 +1,19 @@
 -- ============================================================
--- MetricFlow B2B Platform — Self-Role Protection
--- Migration: 006_protect_self_role.sql
+-- Platforma B2B MetricFlow: protecția propriului rol
+-- Migrarea: 006_protect_self_role.sql
 -- ============================================================
 --
--- WHY THIS MIGRATION EXISTS:
--- An admin could previously change their OWN role to sales_rep/viewer and immediately
--- lose access to the role-management UI — with no way back unless another admin exists
--- (and in a single-admin deployment, no way back at all). This redefines update_user_role
--- to forbid an admin from changing their own role; role changes for an account must be
--- performed by a *different* admin. (The UI mirrors this by disabling the caller's own row.)
+-- DE CE EXISTĂ ACEASTĂ MIGRARE:
+-- Un administrator își putea schimba anterior PROPRIUL rol în sales_rep/viewer și
+-- pierdea imediat accesul la gestiunea rolurilor, fără cale de întoarcere dacă nu există alt admin
+-- (iar într-un deployment cu un singur admin, deloc). Aceasta redefinește update_user_role
+-- pentru a interzice unui admin să-și schimbe propriul rol; schimbarea rolului unui cont trebuie
+-- făcută de un alt admin. (Interfața reflectă asta dezactivând rândul propriu al apelantului.)
 
 create or replace function public.update_user_role(target_user_id uuid, new_role user_role)
 returns void as $$
 begin
-  -- Only admins may manage roles.
+  -- Doar adminii pot gestiona rolurile.
   if not exists (
     select 1 from public.user_profiles
     where id = auth.uid() and role = 'admin'
@@ -21,7 +21,7 @@ begin
     raise exception 'Access Denied: Only admins can manage roles';
   end if;
 
-  -- An admin cannot change their own role (prevents self-lockout).
+  -- Un admin nu își poate schimba propriul rol (previne auto-blocarea).
   if target_user_id = auth.uid() then
     raise exception 'You cannot change your own role';
   end if;
